@@ -11,7 +11,7 @@ import (
 
 // Recorder records notes into a MIDI SMF file.
 type Recorder struct {
-	file *smf.SMF
+	file   *smf.SMF
 }
 
 func New() *Recorder {
@@ -20,9 +20,22 @@ func New() *Recorder {
 	}
 }
 
+type Event struct {
+	Timestamp time.Time
+	Message   midi.Message
+}
+
+func At(msg midi.Message, when time.Time) Event {
+	return Event{when, msg}
+}
+
+func Now(msg midi.Message) Event {
+	return Event{time.Now(), msg}
+}
+
 // Record, given a channel full of midi messages, writes them into the SMF
 // until the channel is closed.
-func (r *Recorder) Record(bpm float64, c <-chan midi.Message) {
+func (r *Recorder) Record(bpm float64, c <-chan Event) {
 	ticks := r.file.TimeFormat.(smf.MetricTicks)
 
 	var tr smf.Track
@@ -30,21 +43,21 @@ func (r *Recorder) Record(bpm float64, c <-chan midi.Message) {
 
 	var lastNano int64
 	for msg := range c {
-		thisNano := time.Now().UnixNano()
+		thisNano := msg.Timestamp.UnixNano()
 		if lastNano == 0 {
 			lastNano = thisNano
 		}
 		deltaNano := thisNano - lastNano
 		deltaTicks := ticks.Ticks(bpm, time.Duration(deltaNano))
 		lastNano = thisNano
-		tr.Add(deltaTicks, msg)
+		tr.Add(deltaTicks, msg.Message)
 	}
-	tr.Close(0)
+	tr.Close(960)
 	r.file.Add(tr)
 }
 
 func (r *Recorder) SMF() (*smf.SMF, error) {
-	if !r.file.Tracks[0].IsClosed() {
+	if len(r.file.Tracks) == 0 || !r.file.Tracks[0].IsClosed() {
 		return nil, fmt.Errorf("recorder is not closed")
 	}
 	return r.file, nil

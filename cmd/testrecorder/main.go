@@ -26,14 +26,14 @@ var (
 func run() error {
 	flag.Parse()
 
-	c := make(chan midi.Message)
+	c := make(chan recorder.Event)
 
 	r := recorder.New()
 	go r.Record(120, c)
 
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
-		c <- midi.NoteOn(1, uint8(*note), 100)
+		c <- recorder.Now(midi.NoteOn(1, uint8(*note), 100))
 	}
 	close(c)
 	time.Sleep(time.Second)
