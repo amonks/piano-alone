@@ -6,6 +6,8 @@ import (
 	"net"
 	"net/http"
 	"os"
+
+	"monks.co/piano-alone/server"
 )
 
 func main() {
@@ -16,5 +18,6 @@ func main() {
 		os.Exit(1)
 	}
 	fmt.Printf("Listening at %s\n", addr)
-	log.Fatal(http.Serve(listener, http.FileServer(http.Dir("./website"))))
+	s := server.New()
+	log.Fatal(http.Serve(listener, s))
 }

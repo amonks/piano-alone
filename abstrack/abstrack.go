@@ -2,7 +2,9 @@ package abstrack
 
 import (
 	"bytes"
+	"sort"
 
+	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/smf"
 )
 
@@ -48,6 +50,53 @@ func (at *AbsTrack) ToSMF() smf.Track {
 			Message: event.Message,
 		}
 		lastTimestamp = event.Timestamp
+	}
+	return dst
+}
+
+type CountedKey struct {
+	Key   uint8
+	Count int
+}
+
+func (at *AbsTrack) CountNotes() []CountedKey {
+	keyset := map[uint8]int{}
+	var channel, key, velocity uint8
+	for _, ev := range at.Events {
+		if !ev.Message.GetNoteOn(&channel, &key, &velocity) {
+			continue
+		}
+		keyset[key] += 1
+	}
+	var keys []CountedKey
+	for key, count := range keyset {
+		keys = append(keys, CountedKey{key, count})
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i].Count < keys[j].Count })
+	return keys
+}
+
+func (at *AbsTrack) Select(notes []uint8) *AbsTrack {
+	noteSet := map[uint8]struct{}{}
+	for _, note := range notes {
+		noteSet[note] = struct{}{}
+	}
+	dst := New()
+	var channel, key, velocity uint8
+	for _, ev := range at.Events {
+		switch ev.Message.Type() {
+		case midi.NoteOnMsg:
+			ev.Message.GetNoteOn(&channel, &key, &velocity)
+			if _, has := noteSet[key]; !has {
+				continue
+			}
+		case midi.NoteOffMsg:
+			ev.Message.GetNoteOff(&channel, &key, &velocity)
+			if _, has := noteSet[key]; !has {
+				continue
+			}
+		}
+		dst.Events = append(dst.Events, ev)
 	}
 	return dst
 }
