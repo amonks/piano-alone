@@ -16,6 +16,20 @@ type Server struct {
 	players   map[string]*PlayerSession
 }
 
+func New() *Server {
+	return &Server{
+		commands: make(chan []byte),
+		players:  map[string]*PlayerSession{},
+	}
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", s.HandleWebsocket)
+	mux.Handle("/", http.FileServer(http.Dir("./website")))
+	mux.ServeHTTP(w, req)
+}
+
 type serverState int
 
 const (
@@ -49,36 +63,7 @@ func (s *Server) createPlayerSession(fingerprint string) *PlayerSession {
 	return ps
 }
 
-func (s *Server) HandlePlayerWebsocket(w http.ResponseWriter, req *http.Request) {
-	c, err := upgrader.Upgrade(w, req, nil)
-	if err != nil {
-		log.Printf("ws upgrade error: %s", err)
-		return
-	}
-	defer c.Close()
-
-	for {
-		mt, message, err := c.ReadMessage()
-		if err != nil {
-			log.Printf("ws read error: %s", err)
-			break
-		}
-
-		log.Printf("recv: %s", message)
-		err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
-
-	}
-}
-
-func (s *Server) HandleIndex(w http.ResponseWriter, req *http.Request) {
-
-}
-
-func (s *Server) HandleClientWebsocket(w http.ResponseWriter, req *http.Request) {
+func (s *Server) HandleWebsocket(w http.ResponseWriter, req *http.Request) {
 	c, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		log.Printf("ws upgrade error: %s", err)
