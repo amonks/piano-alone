@@ -1,11 +1,18 @@
 [[task]]
-  id = "build"
+  id = "dev"
+  type = "long"
+  dependencies = ["generate", "build-wasm"]
+  cmd = "go run ./cmd/serve"
+
+[[task]]
+  id = "build-wasm"
   type = "short"
-  watch = ["midihero/*"]
+  watch = ["**/*.go"]
+  dependencies = ["generate"]
   cmd = "GOOS=js GOARCH=wasm go build -o website/main.wasm ./midihero"
 
 [[task]]
-  id = "dev"
-  type = "long"
-  dependencies = ["build"]
-  cmd = "go run ./cmd/serve"
+  id = "generate"
+  type = "short"
+  watch = ["**/*.go"]
+  cmd = "go generate ./..."
