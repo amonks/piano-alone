@@ -1,18 +1,22 @@
-// jsws is based on nhooyr/websocket, which comes with the following notice:
+// jsws is based on this code:
 //
-// // Copyright (c) 2023 Anmol Sethi <hi@nhooyr.io>
+// https://github.com/nhooyr/websocket/blob/master/internal/wsjs/wsjs_js.go
 //
-// Permission to use, copy, modify, and distribute this software for any
-// purpose with or without fee is hereby granted, provided that the above
-// copyright notice and this permission notice appear in all copies.
+// which comes with the following notice:
 //
-// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-// WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-// ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-// WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-// ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-// OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+//     Copyright (c) 2023 Anmol Sethi <hi@nhooyr.io>
+//
+//     Permission to use, copy, modify, and distribute this software for any
+//     purpose with or without fee is hereby granted, provided that the above
+//     copyright notice and this permission notice appear in all copies.
+//
+//     THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+//     WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+//     MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+//     ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+//     WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+//     ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+//     OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 package jsws
 
@@ -67,7 +71,8 @@ func (wc *WebsocketClient) OnMessage(handler func([]byte)) (func(), error) {
 
 func (wc *WebsocketClient) OnError(handler func(error)) (func(), error) {
 	return wc.addEventListener("error", func(val js.Value) {
-		handler(fmt.Errorf("%s", val.Call("toString").String()))
+		message := val.Get("message").String()
+		handler(fmt.Errorf("websocket error: '%s'", message))
 	})
 }
 
