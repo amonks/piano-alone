@@ -2,44 +2,35 @@ package gameserver
 
 import (
 	"bytes"
+	"fmt"
 	"log"
 	"time"
 
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/abstrack"
 	"monks.co/piano-alone/pianists"
+	"monks.co/piano-alone/proto"
 )
 
-type Message struct {
-	Type   string
-	Player string
-	Data   []byte
-}
+const (
+	lobbyDur    = time.Second * 10
+	recordDur   = time.Second * 5
+	playbackDur = time.Second * 5
+)
 
 type player struct {
 	state       string
 	fingerprint string
 	pianist     string
+	notes       []uint8
 	smf         *smf.SMF
 }
 
-type gamePhase byte
-
-const (
-	gamePhaseUninitialized gamePhase = iota
-	gamePhaseLobby
-	gamePhaseSplitting
-	gamePhaseHero
-	gamePhaseJoining
-	gamePhasePlayback
-	gamePhaseDone
-)
-
 type GameServer struct {
-	phase   gamePhase
+	phase   proto.GamePhase
 	exp     time.Time
-	send    chan<- *Message
-	recv    <-chan *Message
+	send    chan<- *proto.Message
+	recv    <-chan *proto.Message
 	players map[string]*player
 	song    *smf.SMF
 }
@@ -51,9 +42,13 @@ func New() *GameServer {
 	}
 }
 
-func (gs *GameServer) Start(send chan<- *Message, recv <-chan *Message, song *smf.SMF) {
+func (gs *GameServer) Start(send chan<- *proto.Message, recv <-chan *proto.Message, song *smf.SMF) error {
+	gs.song = song
+	gs.send = send
+	gs.recv = recv
+
 	// lobby phase
-	done := gs.setPhase(gamePhaseLobby, time.Minute)
+	done := gs.setPhase(proto.GamePhaseLobby, lobbyDur)
 lobby:
 	select {
 	case msg := <-recv:
@@ -73,13 +68,17 @@ lobby:
 		}
 		goto lobby
 	case <-done:
+		fmt.Println("DONE")
 	}
 
 	// split tracks
-	gs.setPhase(gamePhaseSplitting, 0)
+	gs.setPhase(proto.GamePhaseSplitting, 0)
+	if err := gs.splitTracksForPlayers(); err != nil {
+		return err
+	}
 
 	// hero phase
-	done = gs.setPhase(gamePhaseHero, time.Minute)
+	done = gs.setPhase(proto.GamePhaseHero, recordDur)
 hero:
 	select {
 	case msg := <-recv:
@@ -98,28 +97,33 @@ hero:
 	}
 
 	// combine tracks
-	gs.setPhase(gamePhaseJoining, 0)
+	gs.setPhase(proto.GamePhaseJoining, 0)
 	file := gs.combinePlayerTracks()
 	var buf bytes.Buffer
-	file.WriteTo(&buf)
+	if _, err := file.WriteTo(&buf); err != nil {
+		return err
+	}
 	bs := buf.Bytes()
 
 	// playback phase
-	gs.setPhase(gamePhasePlayback, 0)
+	done = gs.setPhase(proto.GamePhasePlayback, playbackDur)
 	gs.broadcast("combined", bs)
+	<-done
 
-	//done
-	gs.setPhase(gamePhaseDone, 0)
+	// done
+	gs.setPhase(proto.GamePhaseDone, 0)
+	return nil
 }
 
-func (gs *GameServer) setPhase(phase gamePhase, dur time.Duration) <-chan time.Time {
+func (gs *GameServer) setPhase(phase proto.GamePhase, dur time.Duration) <-chan time.Time {
+	log.Println("phase:", phase)
+	gs.broadcast("phase", []byte{byte(phase)})
 	gs.phase = phase
 	if dur == 0 {
 		gs.exp = time.Time{}
 		return nil
 	}
 	gs.exp = time.Now().Add(dur)
-	gs.broadcast("phase", []byte{byte(phase)})
 	return time.After(time.Until(gs.exp))
 }
 
@@ -132,17 +136,27 @@ func (gs *GameServer) addPlayer(fingerprint string) {
 	}
 }
 
-func (gs *GameServer) splitTracksForPlayers() {
-	playerCount := 0
-	for _, p := range gs.players {
-		if p.state == "connected" {
-			playerCount += 1
-		}
+func (gs *GameServer) splitTracksForPlayers() error {
+	var fingerprints []string
+	for f := range gs.players {
+		fingerprints = append(fingerprints, f)
 	}
 	track := abstrack.FromSMF(gs.song.Tracks[0])
 	notes := track.CountNotes()
-	notesPerPlayer := len(notes) / playerCount
-	log.Println("TODO", notesPerPlayer)
+	for i, note := range notes {
+		player := fingerprints[i%len(fingerprints)]
+		gs.players[player].notes = append(gs.players[player].notes, note.Key)
+	}
+	for _, player := range gs.players {
+		split := smf.New()
+		split.Add(track.Select(player.notes).ToSMF())
+		var buf bytes.Buffer
+		if _, err := split.WriteTo(&buf); err != nil {
+			return err
+		}
+		gs.sendTo(player.fingerprint, "split", buf.Bytes())
+	}
+	return nil
 }
 
 func (gs *GameServer) combinePlayerTracks() *smf.SMF {
@@ -159,7 +173,7 @@ func (gs *GameServer) combinePlayerTracks() *smf.SMF {
 }
 
 func (gs *GameServer) broadcast(msgType string, data []byte) {
-	gs.send <- &Message{
+	gs.send <- &proto.Message{
 		Type:   msgType,
 		Player: "*",
 		Data:   data,
@@ -167,7 +181,7 @@ func (gs *GameServer) broadcast(msgType string, data []byte) {
 }
 
 func (gs *GameServer) sendTo(fingerprint string, msgType string, data []byte) {
-	gs.send <- &Message{
+	gs.send <- &proto.Message{
 		Type:   msgType,
 		Player: fingerprint,
 		Data:   data,
