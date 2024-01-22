@@ -3,87 +3,92 @@ package server
 import (
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/websocket"
+	"gitlab.com/gomidi/midi/v2/smf"
+	"monks.co/piano-alone/gameserver"
+	"monks.co/piano-alone/proto"
 )
 
 type Server struct {
-	state    serverState
-	commands chan ([]byte)
+	players map[string]*Player
 
-	playersMu sync.RWMutex
-	players   map[string]*PlayerSession
+	inbox  chan *proto.Message
+	outbox chan *proto.Message
 }
 
 func New() *Server {
-	return &Server{
-		commands: make(chan []byte),
-		players:  map[string]*PlayerSession{},
+	return &Server{}
+}
+
+func (s *Server) Start() error {
+	gs := gameserver.New()
+	s.players = map[string]*Player{}
+	s.outbox = make(chan *proto.Message)
+	s.inbox = make(chan *proto.Message)
+	go func() {
+		for m := range s.outbox {
+			if m.Player == "*" {
+				for _, player := range s.players {
+					if err := player.conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
+						panic(err)
+					}
+				}
+				continue
+			}
+
+			player, got := s.players[m.Player]
+			if !got {
+				panic("no such player " + m.Player)
+			}
+			if err := player.conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
+				panic(err)
+			}
+		}
+	}()
+	f, err := smf.ReadFile("example.mid")
+	if err != nil {
+		return err
 	}
+	return gs.Start(s.outbox, s.inbox, f)
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", s.HandleWebsocket)
 	mux.Handle("/", http.FileServer(http.Dir("./website")))
+	mux.HandleFunc("/ws", s.HandleWebsocket)
 	mux.ServeHTTP(w, req)
 }
 
-type serverState int
-
-const (
-	serverStateUninitialized serverState = iota
-	serverStateWaitingForPlayers
-	serverStateRecording
-	serverStatePlaying
-	serverStateDone
-)
-
 var upgrader = websocket.Upgrader{}
 
-func (s *Server) FindOrCreatePlayerSession(fingerprint string) *PlayerSession {
-	if got := s.getPlayerSession(fingerprint); got != nil {
-		return got
-	}
-	return s.createPlayerSession(fingerprint)
-}
-
-func (s *Server) getPlayerSession(fingerprint string) *PlayerSession {
-	s.playersMu.RLock()
-	defer s.playersMu.RUnlock()
-	return s.players[fingerprint]
-}
-
-func (s *Server) createPlayerSession(fingerprint string) *PlayerSession {
-	s.playersMu.Lock()
-	defer s.playersMu.Unlock()
-	ps := NewPlayerSession(fingerprint)
-	s.players[fingerprint] = ps
-	return ps
+type Player struct {
+	conn *websocket.Conn
 }
 
 func (s *Server) HandleWebsocket(w http.ResponseWriter, req *http.Request) {
-	c, err := upgrader.Upgrade(w, req, nil)
-	if err != nil {
-		log.Printf("ws upgrade error: %s", err)
+	fingerprint := req.URL.Query().Get("fingerprint")
+	if fingerprint == "" {
+		http.Error(w, "no fingerprint specified", 400)
 		return
 	}
-	defer c.Close()
+	c, err := upgrader.Upgrade(w, req, nil)
+	if err != nil {
+		http.Error(w, "ws upgrade error: "+err.Error(), 500)
+		return
+	}
+	player := &Player{c}
+	s.players[fingerprint] = player
 
 	for {
-		mt, message, err := c.ReadMessage()
+		_, bs, err := c.ReadMessage()
 		if err != nil {
 			log.Printf("ws read error: %s", err)
+			c.Close()
 			break
 		}
 
-		log.Printf("recv: %s", message)
-		err = c.WriteMessage(mt, message)
-		if err != nil {
-			log.Println("write:", err)
-			break
-		}
-
+		m := proto.MessageFromBytes(bs)
+		s.inbox <- m
 	}
 }

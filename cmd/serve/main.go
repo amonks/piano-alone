@@ -19,5 +19,6 @@ func main() {
 	}
 	fmt.Printf("Listening at %s\n", addr)
 	s := server.New()
+	go s.Start()
 	log.Fatal(http.Serve(listener, s))
 }
