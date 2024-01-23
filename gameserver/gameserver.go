@@ -8,12 +8,12 @@ import (
 
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/abstrack"
-	"monks.co/piano-alone/pianists"
 	"monks.co/piano-alone/game"
+	"monks.co/piano-alone/pianists"
 )
 
 const (
-	lobbyDur    = time.Second * 10
+	lobbyDur    = time.Second * 20
 	recordDur   = time.Second * 5
 	playbackDur = time.Second * 5
 )
@@ -33,7 +33,7 @@ func New() *GameServer {
 }
 
 func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) error {
-	gs.state.Song = song
+	gs.state.Score = song
 	gs.send = send
 	gs.recv = recv
 
@@ -46,14 +46,14 @@ lobby:
 		case game.MessageTypeJoin:
 			if _, got := gs.state.Players[msg.Player]; !got {
 				gs.addPlayer(msg.Player)
-				gs.sendTo(msg.Player, game.MessageTypeInitialState, []byte("TODO"))
-				gs.broadcast(game.MessageTypeJoin, []byte(msg.Player))
+				gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
+				gs.broadcast(game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[msg.Player].Bytes())
 			} else {
 				gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateConnected
 			}
 		case game.MessageTypeLeave:
 			gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
-			gs.broadcast(game.MessageTypeJoin, []byte(msg.Player))
+			gs.broadcast(game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
 		default:
 			log.Printf("unhandled message type '%s'", msg.Type.String())
 		}
@@ -108,13 +108,17 @@ hero:
 
 func (gs *GameServer) setPhase(phase game.GamePhase, dur time.Duration) <-chan time.Time {
 	log.Println("phase:", phase)
-	gs.broadcast(game.MessageTypeBroadcastPhase, []byte{byte(phase)})
-	gs.state.Phase = phase
 	if dur == 0 {
+		gs.state.Phase = phase
 		gs.state.PhaseExp = time.Time{}
+		msg := &game.PhaseChangeMessage{Phase: phase}
+		gs.broadcast(game.MessageTypeBroadcastPhase, msg.Bytes())
 		return nil
 	}
+	gs.state.Phase = phase
 	gs.state.PhaseExp = time.Now().Add(dur)
+	msg := &game.PhaseChangeMessage{Phase: phase, Exp: gs.state.PhaseExp}
+	gs.broadcast(game.MessageTypeBroadcastPhase, msg.Bytes())
 	return time.After(time.Until(gs.state.PhaseExp))
 }
 
@@ -131,7 +135,7 @@ func (gs *GameServer) splitTracksForPlayers() error {
 	for f := range gs.state.Players {
 		fingerprints = append(fingerprints, f)
 	}
-	track := abstrack.FromSMF(gs.state.Song.Tracks[0])
+	track := abstrack.FromSMF(gs.state.Score.Tracks[0])
 	notes := track.CountNotes()
 	for i, note := range notes {
 		player := fingerprints[i%len(fingerprints)]

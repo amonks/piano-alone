@@ -11,6 +11,7 @@ import (
 
 type GameClient struct {
 	fingerprint string
+	state       *game.State
 }
 
 func New(fingerprint string) *GameClient {
@@ -23,16 +24,38 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 		Player: c.fingerprint,
 		Data:   []byte(c.fingerprint),
 	}
+	state := game.SelectMessageByType(recv, game.MessageTypeInitialState)
+	c.state = game.StateFromBytes(state.Data)
 
-	// splitMsg phase
-	splitMsg := game.SelectMessageByType(recv, game.MessageTypeAssignment)
+	// Lobby Phase
+	var splitMsg *game.Message
+Loop:
+	for {
+		m := <-recv
+		switch m.Type {
+		case game.MessageTypeBroadcastConnectedPlayer:
+			player := game.PlayerFromBytes(m.Data)
+			c.state.Players[player.Fingerprint] = player
+		case game.MessageTypeBroadcastDisconnectedPlayer:
+			c.state.Players[string(m.Data)].ConnectionState = game.ConnectionStateDisconnected
+		case game.MessageTypeBroadcastPhase:
+			msg := game.PhaseChangeMessageFromBytes(m.Data)
+			c.state.Phase = msg.Phase
+			c.state.PhaseExp = msg.Exp
+		case game.MessageTypeAssignment:
+			splitMsg = m
+			break Loop
+		}
+	}
+
+	// Splitting Phase
 	r := bytes.NewReader(splitMsg.Data)
 	splitTrack, err := smf.ReadFrom(r)
 	if err != nil {
 		return fmt.Errorf("error constructing received smf: %w", err)
 	}
 
-	// hero phase
+	// Hero Phase
 	game.SelectPhaseChangeMessage(recv, game.GamePhaseHero)
 	playedTrack := splitTrack
 	var buf bytes.Buffer
@@ -43,12 +66,12 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 		Data:   buf.Bytes(),
 	}
 
-	// combine tracks
+	// Joining Phase
 	selectMessage("joining", recv, func(m *game.Message) bool {
 		return m.IsPhaseChangeTo(game.GamePhaseJoining)
 	})
 
-	// playback phase
+	// Playback Phase
 	selectMessage("playback", recv, func(m *game.Message) bool {
 		return m.IsPhaseChangeTo(game.GamePhasePlayback)
 	})
@@ -57,7 +80,7 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 	})
 	log.Println("combined:", combined.Data)
 
-	// done
+	// Done Phase
 	selectMessage("done", recv, func(m *game.Message) bool {
 		return m.IsPhaseChangeTo(game.GamePhaseDone)
 	})

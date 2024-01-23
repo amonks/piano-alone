@@ -9,11 +9,16 @@ import (
 )
 
 type State struct {
-	Song      *smf.SMF
+	Score     *smf.SMF
 	Phase     GamePhase
 	PhaseExp  time.Time
 	Players   map[string]*Player
 	Rendition *smf.SMF
+}
+
+func init() {
+	var mt smf.MetricTicks
+	gob.Register(mt)
 }
 
 func NewState() *State {
@@ -21,7 +26,7 @@ func NewState() *State {
 		Phase:    GamePhaseUninitialized,
 		PhaseExp: time.Time{},
 		Players:  map[string]*Player{},
-		Song:     nil,
+		Score:    nil,
 	}
 }
 
@@ -64,6 +69,25 @@ type Player struct {
 	Notes           []uint8
 }
 
+func PlayerFromBytes(bs []byte) *Player {
+	buf := bytes.NewReader(bs)
+	dec := gob.NewDecoder(buf)
+	var p Player
+	if err := dec.Decode(&p); err != nil {
+		panic(err)
+	}
+	return &p
+}
+
+func (p *Player) Bytes() []byte {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(p); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
 //go:generate go run golang.org/x/tools/cmd/stringer -type=ConnectionState
 type ConnectionState byte
 
@@ -90,6 +114,8 @@ const (
 	MessageTypeSubmitPartialTrack
 
 	MessageTypeInitialState
+	MessageTypeBroadcastConnectedPlayer
+	MessageTypeBroadcastDisconnectedPlayer
 	MessageTypeAssignment
 	MessageTypeBroadcastPhase
 	MessageTypeBroadcastCombinedTrack
@@ -137,4 +163,28 @@ func (m *Message) HasType(t MessageType) bool {
 
 func (m *Message) IsPhaseChangeTo(p GamePhase) bool {
 	return m.Type == MessageTypeBroadcastPhase && GamePhase(m.Data[0]) == p
+}
+
+type PhaseChangeMessage struct {
+	Phase GamePhase
+	Exp   time.Time
+}
+
+func (m *PhaseChangeMessage) Bytes() []byte {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(m); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+func PhaseChangeMessageFromBytes(bs []byte) *PhaseChangeMessage {
+	buf := bytes.NewReader(bs)
+	dec := gob.NewDecoder(buf)
+	var m PhaseChangeMessage
+	if err := dec.Decode(&m); err != nil {
+		panic(err)
+	}
+	return &m
 }
