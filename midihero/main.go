@@ -1,4 +1,4 @@
-//go:build js && wasm
+//go:build wasm || js
 
 package main
 
@@ -11,7 +11,7 @@ import (
 
 	"monks.co/piano-alone/gameclient"
 	"monks.co/piano-alone/jsws"
-	"monks.co/piano-alone/proto"
+	"monks.co/piano-alone/game"
 )
 
 func main() {
@@ -26,11 +26,11 @@ func main() {
 		panic(err)
 	}
 
-	inbox := make(chan *proto.Message)
-	outbox := make(chan *proto.Message)
+	inbox := make(chan *game.Message)
+	outbox := make(chan *game.Message)
 
 	if _, err := wc.OnMessage(func(bs []byte) {
-		inbox <- proto.MessageFromBytes(bs)
+		inbox <- game.MessageFromBytes(bs)
 	}); err != nil {
 		panic(err)
 	}

@@ -1,3 +1,5 @@
+//go:build wasm || js
+
 // jsws is based on this code:
 //
 // https://github.com/nhooyr/websocket/blob/master/internal/wsjs/wsjs_js.go

@@ -7,14 +7,14 @@ import (
 	"github.com/gorilla/websocket"
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/gameserver"
-	"monks.co/piano-alone/proto"
+	"monks.co/piano-alone/game"
 )
 
 type Server struct {
 	players map[string]*Player
 
-	inbox  chan *proto.Message
-	outbox chan *proto.Message
+	inbox  chan *game.Message
+	outbox chan *game.Message
 }
 
 func New() *Server {
@@ -24,8 +24,8 @@ func New() *Server {
 func (s *Server) Start() error {
 	gs := gameserver.New()
 	s.players = map[string]*Player{}
-	s.outbox = make(chan *proto.Message)
-	s.inbox = make(chan *proto.Message)
+	s.outbox = make(chan *game.Message)
+	s.inbox = make(chan *game.Message)
 	go func() {
 		for m := range s.outbox {
 			if m.Player == "*" {
@@ -88,7 +88,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, req *http.Request) {
 			break
 		}
 
-		m := proto.MessageFromBytes(bs)
+		m := game.MessageFromBytes(bs)
 		s.inbox <- m
 	}
 }

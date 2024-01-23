@@ -14,5 +14,4 @@
 [[task]]
   id = "generate"
   type = "short"
-  watch = ["**/*.go"]
   cmd = "go generate ./..."

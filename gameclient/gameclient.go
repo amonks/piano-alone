@@ -6,7 +6,7 @@ import (
 	"log"
 
 	"gitlab.com/gomidi/midi/v2/smf"
-	"monks.co/piano-alone/proto"
+	"monks.co/piano-alone/game"
 )
 
 type GameClient struct {
@@ -17,15 +17,15 @@ func New(fingerprint string) *GameClient {
 	return &GameClient{fingerprint: fingerprint}
 }
 
-func (c *GameClient) Start(send chan<- *proto.Message, recv <-chan *proto.Message) error {
-	send <- &proto.Message{
-		Type:   "join",
+func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message) error {
+	send <- &game.Message{
+		Type:   game.MessageTypeJoin,
 		Player: c.fingerprint,
 		Data:   []byte(c.fingerprint),
 	}
 
 	// splitMsg phase
-	splitMsg := selectMessage("split", recv, msgHasType("split"))
+	splitMsg := game.SelectMessageByType(recv, game.MessageTypeAssignment)
 	r := bytes.NewReader(splitMsg.Data)
 	splitTrack, err := smf.ReadFrom(r)
 	if err != nil {
@@ -33,43 +33,39 @@ func (c *GameClient) Start(send chan<- *proto.Message, recv <-chan *proto.Messag
 	}
 
 	// hero phase
-	selectMessage("hero", recv, msgIsPhase(proto.GamePhaseHero))
+	game.SelectPhaseChangeMessage(recv, game.GamePhaseHero)
 	playedTrack := splitTrack
 	var buf bytes.Buffer
 	playedTrack.WriteTo(&buf)
-	send <- &proto.Message{
-		Type:   "track",
+	send <- &game.Message{
+		Type:   game.MessageTypeSubmitPartialTrack,
 		Player: c.fingerprint,
 		Data:   buf.Bytes(),
 	}
 
 	// combine tracks
-	selectMessage("joining", recv, msgIsPhase(proto.GamePhaseJoining))
+	selectMessage("joining", recv, func(m *game.Message) bool {
+		return m.IsPhaseChangeTo(game.GamePhaseJoining)
+	})
 
 	// playback phase
-	selectMessage("playback", recv, msgIsPhase(proto.GamePhasePlayback))
-	combined := selectMessage("combined", recv, msgHasType("combined"))
+	selectMessage("playback", recv, func(m *game.Message) bool {
+		return m.IsPhaseChangeTo(game.GamePhasePlayback)
+	})
+	combined := selectMessage("combined", recv, func(m *game.Message) bool {
+		return m.HasType(game.MessageTypeBroadcastCombinedTrack)
+	})
 	log.Println("combined:", combined.Data)
 
 	// done
-	selectMessage("done", recv, msgIsPhase(proto.GamePhaseDone))
+	selectMessage("done", recv, func(m *game.Message) bool {
+		return m.IsPhaseChangeTo(game.GamePhaseDone)
+	})
 
 	return nil
 }
 
-func msgHasType(t string) func(*proto.Message) bool {
-	return func(msg *proto.Message) bool {
-		return msg.Type == t
-	}
-}
-
-func msgIsPhase(p proto.GamePhase) func(*proto.Message) bool {
-	return func(msg *proto.Message) bool {
-		return msg.Type == "phase" && proto.GamePhase(msg.Data[0]) == p
-	}
-}
-
-func selectMessage(label string, c <-chan *proto.Message, pred func(m *proto.Message) bool) *proto.Message {
+func selectMessage(label string, c <-chan *game.Message, pred func(m *game.Message) bool) *game.Message {
 	log.Printf("waiting for %s", label)
 	for m := range c {
 		if pred(m) {

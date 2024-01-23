@@ -9,7 +9,7 @@ import (
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/abstrack"
 	"monks.co/piano-alone/pianists"
-	"monks.co/piano-alone/proto"
+	"monks.co/piano-alone/game"
 )
 
 const (
@@ -18,53 +18,44 @@ const (
 	playbackDur = time.Second * 5
 )
 
-type player struct {
-	state       string
-	fingerprint string
-	pianist     string
-	notes       []uint8
-	smf         *smf.SMF
-}
-
 type GameServer struct {
-	phase   proto.GamePhase
-	exp     time.Time
-	send    chan<- *proto.Message
-	recv    <-chan *proto.Message
-	players map[string]*player
-	song    *smf.SMF
+	send chan<- *game.Message
+	recv <-chan *game.Message
+
+	state    *game.State
+	partials map[string]*smf.SMF
 }
 
 func New() *GameServer {
 	return &GameServer{
-		players: map[string]*player{},
-		song:    nil,
+		state: game.NewState(),
 	}
 }
 
-func (gs *GameServer) Start(send chan<- *proto.Message, recv <-chan *proto.Message, song *smf.SMF) error {
-	gs.song = song
+func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) error {
+	gs.state.Song = song
 	gs.send = send
 	gs.recv = recv
 
 	// lobby phase
-	done := gs.setPhase(proto.GamePhaseLobby, lobbyDur)
+	done := gs.setPhase(game.GamePhaseLobby, lobbyDur)
 lobby:
 	select {
 	case msg := <-recv:
 		switch msg.Type {
-		case "join":
-			if _, got := gs.players[msg.Player]; !got {
+		case game.MessageTypeJoin:
+			if _, got := gs.state.Players[msg.Player]; !got {
 				gs.addPlayer(msg.Player)
-				gs.sendTo(msg.Player, "state", []byte("TODO"))
-				gs.broadcast("connected", []byte(msg.Player))
+				gs.sendTo(msg.Player, game.MessageTypeInitialState, []byte("TODO"))
+				gs.broadcast(game.MessageTypeJoin, []byte(msg.Player))
 			} else {
-				gs.players[msg.Player].state = "connected"
+				gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateConnected
 			}
-		case "leave":
-			gs.players[msg.Player].state = "disconnected"
+		case game.MessageTypeLeave:
+			gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
+			gs.broadcast(game.MessageTypeJoin, []byte(msg.Player))
 		default:
-			log.Printf("unhandled message type '%s'", msg.Type)
+			log.Printf("unhandled message type '%s'", msg.Type.String())
 		}
 		goto lobby
 	case <-done:
@@ -72,23 +63,23 @@ lobby:
 	}
 
 	// split tracks
-	gs.setPhase(proto.GamePhaseSplitting, 0)
+	gs.setPhase(game.GamePhaseSplitting, 0)
 	if err := gs.splitTracksForPlayers(); err != nil {
 		return err
 	}
 
 	// hero phase
-	done = gs.setPhase(proto.GamePhaseHero, recordDur)
+	done = gs.setPhase(game.GamePhaseHero, recordDur)
 hero:
 	select {
 	case msg := <-recv:
 		switch msg.Type {
-		case "track":
+		case game.MessageTypeSubmitPartialTrack:
 			smf, err := smf.ReadFrom(bytes.NewReader(msg.Data))
 			if err != nil {
 				log.Printf("smf parsing error: '%s'", msg.Type)
 			}
-			gs.players[msg.Player].smf = smf
+			gs.partials[msg.Player] = smf
 		default:
 			log.Printf("unhandled message type '%s'", msg.Type)
 		}
@@ -97,91 +88,90 @@ hero:
 	}
 
 	// combine tracks
-	gs.setPhase(proto.GamePhaseJoining, 0)
-	file := gs.combinePlayerTracks()
+	gs.setPhase(game.GamePhaseJoining, 0)
+	gs.combinePlayerTracks()
 	var buf bytes.Buffer
-	if _, err := file.WriteTo(&buf); err != nil {
+	if _, err := gs.state.Rendition.WriteTo(&buf); err != nil {
 		return err
 	}
 	bs := buf.Bytes()
 
 	// playback phase
-	done = gs.setPhase(proto.GamePhasePlayback, playbackDur)
-	gs.broadcast("combined", bs)
+	done = gs.setPhase(game.GamePhasePlayback, playbackDur)
+	gs.broadcast(game.MessageTypeBroadcastCombinedTrack, bs)
 	<-done
 
 	// done
-	gs.setPhase(proto.GamePhaseDone, 0)
+	gs.setPhase(game.GamePhaseDone, 0)
 	return nil
 }
 
-func (gs *GameServer) setPhase(phase proto.GamePhase, dur time.Duration) <-chan time.Time {
+func (gs *GameServer) setPhase(phase game.GamePhase, dur time.Duration) <-chan time.Time {
 	log.Println("phase:", phase)
-	gs.broadcast("phase", []byte{byte(phase)})
-	gs.phase = phase
+	gs.broadcast(game.MessageTypeBroadcastPhase, []byte{byte(phase)})
+	gs.state.Phase = phase
 	if dur == 0 {
-		gs.exp = time.Time{}
+		gs.state.PhaseExp = time.Time{}
 		return nil
 	}
-	gs.exp = time.Now().Add(dur)
-	return time.After(time.Until(gs.exp))
+	gs.state.PhaseExp = time.Now().Add(dur)
+	return time.After(time.Until(gs.state.PhaseExp))
 }
 
 func (gs *GameServer) addPlayer(fingerprint string) {
-	gs.players[fingerprint] = &player{
-		state:       "connected",
-		fingerprint: fingerprint,
-		pianist:     pianists.Hash(fingerprint),
-		smf:         nil,
+	gs.state.Players[fingerprint] = &game.Player{
+		ConnectionState: game.ConnectionStateConnected,
+		Fingerprint:     fingerprint,
+		Pianist:         pianists.Hash(fingerprint),
 	}
 }
 
 func (gs *GameServer) splitTracksForPlayers() error {
 	var fingerprints []string
-	for f := range gs.players {
+	for f := range gs.state.Players {
 		fingerprints = append(fingerprints, f)
 	}
-	track := abstrack.FromSMF(gs.song.Tracks[0])
+	track := abstrack.FromSMF(gs.state.Song.Tracks[0])
 	notes := track.CountNotes()
 	for i, note := range notes {
 		player := fingerprints[i%len(fingerprints)]
-		gs.players[player].notes = append(gs.players[player].notes, note.Key)
+		gs.state.Players[player].Notes = append(gs.state.Players[player].Notes, note.Key)
 	}
-	for _, player := range gs.players {
+	for _, player := range gs.state.Players {
 		split := smf.New()
-		split.Add(track.Select(player.notes).ToSMF())
+		split.Add(track.Select(player.Notes).ToSMF())
 		var buf bytes.Buffer
 		if _, err := split.WriteTo(&buf); err != nil {
 			return err
 		}
-		gs.sendTo(player.fingerprint, "split", buf.Bytes())
+		gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, buf.Bytes())
 	}
 	return nil
 }
 
-func (gs *GameServer) combinePlayerTracks() *smf.SMF {
+func (gs *GameServer) combinePlayerTracks() {
 	track := abstrack.New()
-	for _, player := range gs.players {
-		if player.smf == nil {
+	for _, partial := range gs.partials {
+		if partial == nil {
 			continue
 		}
-		track = track.Merge(abstrack.FromSMF(player.smf.Tracks[0]))
+		track = track.Merge(abstrack.FromSMF(partial.Tracks[0]))
 	}
 	file := smf.New()
 	file.Add(track.ToSMF())
-	return file
+	gs.state.Rendition = file
 }
 
-func (gs *GameServer) broadcast(msgType string, data []byte) {
-	gs.send <- &proto.Message{
+func (gs *GameServer) broadcast(msgType game.MessageType, data []byte) {
+	gs.send <- &game.Message{
 		Type:   msgType,
 		Player: "*",
 		Data:   data,
 	}
 }
 
-func (gs *GameServer) sendTo(fingerprint string, msgType string, data []byte) {
-	gs.send <- &proto.Message{
+func (gs *GameServer) sendTo(fingerprint string, msgType game.MessageType, data []byte) {
+	gs.send <- &game.Message{
 		Type:   msgType,
 		Player: fingerprint,
 		Data:   data,
