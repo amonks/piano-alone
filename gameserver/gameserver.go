@@ -14,7 +14,7 @@ import (
 
 const (
 	lobbyDur    = time.Second * 5
-	recordDur   = time.Second * 5
+	recordDur   = time.Second * 50
 	playbackDur = time.Second * 5
 )
 

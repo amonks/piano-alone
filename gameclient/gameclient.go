@@ -49,7 +49,7 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 		}
 	}()
 	for m := range recv {
-		log.Printf("incoming message (type: '%s'): %+v", m.Type, m)
+		log.Printf("incoming message: '%s'", m.Type)
 		if err := c.handleMessage(m); err != nil {
 			return fmt.Errorf("error handling message '%s': %w", m.Type, err)
 		}
@@ -61,19 +61,19 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 }
 
 func (c *GameClient) Render() *vdom.HTML {
-	return vdom.H("div",
-		vdom.H("section",
-			vdom.H("h1", vdom.T("UI")),
+	return vdom.H("div", "div.container",
+		vdom.H("section", "section.ui",
+			vdom.H("h1", "h1", vdom.T("UI")),
 			c.renderUI(),
 		),
-		vdom.H("section",
-			vdom.H("h1", vdom.T("State")),
-			vdom.H("dl",
-				vdom.H("dt", vdom.T("Phase")),
-				vdom.H("dd", c.renderPhase()),
+		vdom.H("section", "section.state",
+			vdom.H("h1", "h1", vdom.T("State")),
+			vdom.H("dl", "dl",
+				vdom.H("dt", "dt.phase", vdom.T("Phase")),
+				vdom.H("dd", "dd.phase", c.renderPhase()),
 
-				vdom.H("dt", vdom.T("Players")),
-				vdom.H("dd", c.renderPlayerList()),
+				vdom.H("dt", "dt.players", vdom.T("Players")),
+				vdom.H("dd", "dd.players", c.renderPlayerList()),
 			),
 		),
 	)
@@ -83,11 +83,10 @@ func (c *GameClient) renderUI() *vdom.HTML {
 	switch c.state.Phase {
 	case game.GamePhaseHero:
 		if c.myRendition != nil {
-			return vdom.H("span")
+			return vdom.H("span", "null")
 		}
-		return vdom.H("button", vdom.T("submit")).
-			WithAttr("onclick", js.FuncOf(func(js.Value, []js.Value) any {
-				log.Printf("ONCLICK")
+		return vdom.H("button", "button", vdom.T("submit")).
+			WithAttr("onmouseup", js.FuncOf(func(js.Value, []js.Value) any {
 				c.myRendition = c.myScore
 
 				var bs bytes.Buffer
@@ -99,7 +98,7 @@ func (c *GameClient) renderUI() *vdom.HTML {
 				return nil
 			}))
 	default:
-		return vdom.H("span")
+		return vdom.H("span", "null")
 	}
 }
 
@@ -123,9 +122,9 @@ func (c *GameClient) renderPlayerList() *vdom.HTML {
 	var lis []*vdom.HTML
 	for _, f := range playerList {
 		player := c.state.Players[f]
-		li := vdom.H("li",
-			vdom.T(player.Pianist+" "),
-			vdom.H("code", vdom.T("(%s)", player.Fingerprint[:6])),
+		li := vdom.H("li", "",
+			vdom.H("span", "span", vdom.T(player.Pianist+" ")),
+			vdom.H("code", "code", vdom.T("(%s)", player.Fingerprint[:6])),
 		).
 			WithKey(player.Fingerprint)
 		if player.Fingerprint == c.fingerprint {
@@ -136,7 +135,7 @@ func (c *GameClient) renderPlayerList() *vdom.HTML {
 		}
 		lis = append(lis, li)
 	}
-	return vdom.H("ul", lis...)
+	return vdom.H("ul", "ul", lis...)
 }
 
 func (c *GameClient) handleMessage(m *game.Message) error {
@@ -145,7 +144,6 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 		c.state = game.StateFromBytes(m.Data)
 	case game.MessageTypeBroadcastPhase:
 		msg := game.PhaseChangeMessageFromBytes(m.Data)
-		fmt.Println("phase msg:", msg)
 		c.state.Phase = msg.Phase
 		c.state.PhaseExp = msg.Exp
 	case game.MessageTypeBroadcastConnectedPlayer:

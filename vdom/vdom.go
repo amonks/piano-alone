@@ -4,8 +4,13 @@ package vdom
 
 import (
 	"fmt"
+	"log"
+	"math/rand"
+	"strings"
 	"syscall/js"
 )
+
+const debug = false
 
 type VDOM struct {
 	root js.Value
@@ -45,9 +50,10 @@ func T(text string, vals ...any) *HTML {
 	}
 }
 
-func H(kind string, children ...*HTML) *HTML {
+func H(kind string, key string, children ...*HTML) *HTML {
 	return &HTML{
 		Kind:     kind,
+		Key:      key,
 		Children: children,
 	}
 }
@@ -79,6 +85,15 @@ func (html *HTML) Mount(parent js.Value, index int) {
 	for k, v := range html.Attrs {
 		node.Set(k, v)
 	}
+	if debug {
+		var styles []string
+		if s, got := html.Attrs["style"]; got {
+			styles = append(styles, s.(string))
+		}
+		styles = append(styles, fmt.Sprintf("background-color: %s", randomColor()))
+		style := strings.Join(styles, "; ")
+		node.Set("style", style)
+	}
 
 	for i, child := range html.Children {
 		child.Mount(node, i)
@@ -100,6 +115,10 @@ func (html *HTML) Mount(parent js.Value, index int) {
 }
 
 func (html *HTML) Update(parent js.Value, self js.Value, prev *HTML) {
+	//
+	// handle updating self
+	//
+
 	if html.Kind == "TEXT_NODE" {
 		html.UpdateText(parent, self, prev)
 		return
@@ -111,14 +130,67 @@ func (html *HTML) Update(parent js.Value, self js.Value, prev *HTML) {
 		}
 	}
 	for k, v := range html.Attrs {
-		prev, had := prev.Attrs[k]
-		if !had {
-			self.Set(k, v)
-		} else if v != prev {
+		switch v.(type) {
+		case js.Func:
+			// special case: never update func attrs, as they are
+			// incomparable
+			if debug {
+				log.Printf("not updating func attr %s", k)
+			}
+		case string:
+			// only update string attrs if they changed
+			if v != prev.Attrs[k] {
+				if debug {
+					log.Printf("updating attr %s", k)
+				}
+				self.Set(k, v)
+			}
+		default:
+			// if we don't know whether an attr is comparable, just
+			// go ahead and try to update it.
+			if debug {
+				log.Printf("updating attr %s", k)
+			}
 			self.Set(k, v)
 		}
 	}
 
+	//
+	// handle recurring on children
+	//
+	// TODO: do a proper "minimal set of edits" sequence comparison algorithm.
+	// The standard one is from this paper:
+	//     https://publications.mpi-cbg.de/Wu_1990_6334.pdf
+	// Here are some implemenattions:
+	//     go: https://github.com/cubicdaiya/gonp
+	//     js; used for vdom: https://github.com/thi-ng/umbrella/blob/develop/packages/diff/src/array.ts#L53
+	//
+
+	// short-circuit: if we have the same sequence of children, skip a
+	// bunch of work and just update them all.
+	shouldShortCircuit := true
+	if len(html.Children) != len(prev.Children) {
+		shouldShortCircuit = false
+	} else {
+		for i, h := range html.Children {
+			if prev.Children[i].Key != h.Key {
+				shouldShortCircuit = false
+				break
+			}
+		}
+	}
+	if shouldShortCircuit {
+		nodes := self.Get("childNodes")
+		for i, h := range html.Children {
+			h.Update(self, nodes.Index(i), prev.Children[i])
+		}
+		return
+	}
+
+	// We know that elements need to be created, destroyed, or re-ordered.
+	// Let's do some work.
+
+	// Collect the set of current keys.
 	currKeys := map[string]*HTML{}
 	for _, h := range html.Children {
 		if h.Key != "" {
@@ -148,8 +220,10 @@ func (html *HTML) Update(parent js.Value, self js.Value, prev *HTML) {
 		self.Call("removeChild", node)
 	}
 
-	// Go through the HTML we'd like to create, build or update it, then
-	// append it to the DOM.
+	// Go through the elements that should exist, build or update them as
+	// appropriate.
+	//
+	// BUG: this doesn't always order the children correctly.
 	for i, h := range html.Children {
 		if up, isUpdate := toUpdate[h.Key]; isUpdate {
 			h.Update(self, up.node, up.prev)
@@ -178,4 +252,10 @@ func (html *HTML) UpdateText(parent js.Value, self js.Value, prev *HTML) {
 
 func (html *HTML) UnmountText(parent, self js.Value) {
 	parent.Set("innerText", "")
+}
+
+func randomColor() string {
+	hue := rand.Intn(360)
+	return fmt.Sprintf("hsl(%ddeg, 50%%, 90%%)", hue)
+
 }
