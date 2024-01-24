@@ -3,18 +3,43 @@ package server
 import (
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"gitlab.com/gomidi/midi/v2/smf"
-	"monks.co/piano-alone/gameserver"
 	"monks.co/piano-alone/game"
+	"monks.co/piano-alone/gameserver"
 )
 
 type Server struct {
-	players map[string]*Player
+	conns  map[string]*websocket.Conn
+	connMu sync.RWMutex
 
 	inbox  chan *game.Message
 	outbox chan *game.Message
+}
+
+func (s *Server) addConn(fingerprint string, conn *websocket.Conn) {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	s.conns[fingerprint] = conn
+}
+func (s *Server) removeConn(fingerprint string) {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	delete(s.conns, fingerprint)
+}
+func (s *Server) withConn(fingerprint string, f func(*websocket.Conn)) {
+	s.connMu.RLock()
+	defer s.connMu.RUnlock()
+	f(s.conns[fingerprint])
+}
+func (s *Server) eachConn(f func(string, *websocket.Conn)) {
+	s.connMu.RLock()
+	defer s.connMu.RUnlock()
+	for fingerprint, sock := range s.conns {
+		f(fingerprint, sock)
+	}
 }
 
 func New() *Server {
@@ -23,34 +48,38 @@ func New() *Server {
 
 func (s *Server) Start() error {
 	gs := gameserver.New()
-	s.players = map[string]*Player{}
+	s.conns = map[string]*websocket.Conn{}
 	s.outbox = make(chan *game.Message)
 	s.inbox = make(chan *game.Message)
 	go func() {
 		for m := range s.outbox {
 			if m.Player == "*" {
-				for _, player := range s.players {
-					if err := player.conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
+				log.Printf("broadcast: '%s'", m.Type)
+				s.eachConn(func(fingerprint string, sock *websocket.Conn) {
+					if err := sock.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
 						panic(err)
 					}
-				}
+				})
 				continue
 			}
 
-			player, got := s.players[m.Player]
-			if !got {
-				panic("no such player " + m.Player)
-			}
-			if err := player.conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
-				panic(err)
-			}
+			log.Printf("send: '%s'", m.Type)
+			s.withConn(m.Player, func(conn *websocket.Conn) {
+				if conn == nil {
+					panic("no such player " + m.Player)
+				}
+				if err := conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
+					panic(err)
+				}
+			})
 		}
 	}()
 	f, err := smf.ReadFile("example.mid")
 	if err != nil {
 		return err
 	}
-	return gs.Start(s.outbox, s.inbox, f)
+	gs.Start(s.outbox, s.inbox, f)
+	return nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
@@ -61,10 +90,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 var upgrader = websocket.Upgrader{}
-
-type Player struct {
-	conn *websocket.Conn
-}
 
 func (s *Server) HandleWebsocket(w http.ResponseWriter, req *http.Request) {
 	fingerprint := req.URL.Query().Get("fingerprint")
@@ -77,18 +102,21 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "ws upgrade error: "+err.Error(), 500)
 		return
 	}
-	player := &Player{c}
-	s.players[fingerprint] = player
+	s.addConn(fingerprint, c)
 
 	for {
 		_, bs, err := c.ReadMessage()
 		if err != nil {
-			log.Printf("ws read error: %s", err)
 			c.Close()
 			break
 		}
 
 		m := game.MessageFromBytes(bs)
 		s.inbox <- m
+	}
+	s.removeConn(fingerprint)
+	s.inbox <- &game.Message{
+		Type:   game.MessageTypeLeave,
+		Player: fingerprint,
 	}
 }

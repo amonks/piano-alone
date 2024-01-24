@@ -8,7 +8,7 @@
     </style>
   </head>
   <body>
-    <canvas></canvas>
+    <div id="root"></div>
     <script>
       const go = new Go();
       WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)

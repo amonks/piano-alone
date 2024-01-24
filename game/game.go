@@ -109,6 +109,10 @@ type MessageType byte
 const (
 	MessageTypeInvalid MessageType = iota
 
+	MessageTypeExpireLobby
+	MessageTypeExpireHero
+	MessageTypeExpirePlayback
+
 	MessageTypeJoin
 	MessageTypeLeave
 	MessageTypeSubmitPartialTrack

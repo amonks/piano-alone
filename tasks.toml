@@ -2,6 +2,7 @@
   id = "dev"
   type = "long"
   dependencies = ["generate", "build-wasm"]
+  watch = ["**/*.go"]
   cmd = "go run ./cmd/serve"
 
 [[task]]

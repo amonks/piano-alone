@@ -13,14 +13,14 @@ import (
 )
 
 const (
-	lobbyDur    = time.Second * 20
+	lobbyDur    = time.Second * 5
 	recordDur   = time.Second * 5
 	playbackDur = time.Second * 5
 )
 
 type GameServer struct {
 	send chan<- *game.Message
-	recv <-chan *game.Message
+	bus  chan *game.Message
 
 	state    *game.State
 	partials map[string]*smf.SMF
@@ -28,82 +28,106 @@ type GameServer struct {
 
 func New() *GameServer {
 	return &GameServer{
-		state: game.NewState(),
+		state:    game.NewState(),
+		partials: map[string]*smf.SMF{},
 	}
 }
 
-func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) error {
+func tee(c <-chan *game.Message) <-chan *game.Message {
+	out := make(chan *game.Message)
+	go func() {
+		for m := range c {
+			log.Printf("got: '%s'", m.Type.String())
+			out <- m
+		}
+		close(out)
+	}()
+	return out
+}
+
+func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) {
 	gs.state.Score = song
 	gs.send = send
-	gs.recv = recv
+	gs.bus = make(chan *game.Message)
 
-	// lobby phase
-	done := gs.setPhase(game.GamePhaseLobby, lobbyDur)
-lobby:
-	select {
-	case msg := <-recv:
-		switch msg.Type {
-		case game.MessageTypeJoin:
-			if _, got := gs.state.Players[msg.Player]; !got {
-				gs.addPlayer(msg.Player)
-				gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
-				gs.broadcast(game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[msg.Player].Bytes())
-			} else {
-				gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateConnected
+	msgs := make(chan *game.Message)
+	go func() {
+		var m *game.Message
+		var ok bool
+		for {
+			select {
+			case m, ok = <-gs.bus:
+			case m, ok = <-recv:
 			}
-		case game.MessageTypeLeave:
-			gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
-			gs.broadcast(game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
-		default:
-			log.Printf("unhandled message type '%s'", msg.Type.String())
-		}
-		goto lobby
-	case <-done:
-		fmt.Println("DONE")
-	}
-
-	// split tracks
-	gs.setPhase(game.GamePhaseSplitting, 0)
-	if err := gs.splitTracksForPlayers(); err != nil {
-		return err
-	}
-
-	// hero phase
-	done = gs.setPhase(game.GamePhaseHero, recordDur)
-hero:
-	select {
-	case msg := <-recv:
-		switch msg.Type {
-		case game.MessageTypeSubmitPartialTrack:
-			smf, err := smf.ReadFrom(bytes.NewReader(msg.Data))
-			if err != nil {
-				log.Printf("smf parsing error: '%s'", msg.Type)
+			if !ok {
+				return
 			}
-			gs.partials[msg.Player] = smf
-		default:
-			log.Printf("unhandled message type '%s'", msg.Type)
+			log.Printf("handle: '%s'", m.Type.String())
+			msgs <- m
 		}
-		goto hero
-	case <-done:
+	}()
+
+	for {
+		msg := <-msgs
+		if err := gs.handleMessage(msg); err != nil {
+			log.Printf("msg '%s' produced error: %s", msg.Type, err)
+		}
 	}
+}
 
-	// combine tracks
-	gs.setPhase(game.GamePhaseJoining, 0)
-	gs.combinePlayerTracks()
-	var buf bytes.Buffer
-	if _, err := gs.state.Rendition.WriteTo(&buf); err != nil {
-		return err
+func (gs *GameServer) handleMessage(msg *game.Message) error {
+	switch msg.Type {
+	case game.MessageTypeJoin:
+		shouldStart := gs.state.Players == nil || len(gs.state.Players) == 0
+		if _, got := gs.state.Players[msg.Player]; !got {
+			gs.addPlayer(msg.Player)
+		}
+		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateConnected
+		gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
+		gs.broadcast(game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[msg.Player].Bytes())
+		if shouldStart {
+			end := gs.setPhase(game.GamePhaseLobby, lobbyDur)
+			gs.after(end, game.MessageTypeExpireLobby)
+		}
+	case game.MessageTypeLeave:
+		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
+		gs.broadcast(game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
+	case game.MessageTypeExpireLobby:
+		gs.setPhase(game.GamePhaseSplitting, 0)
+		if err := gs.splitTracksForPlayers(); err != nil {
+			return fmt.Errorf("track splitting error: %s", err)
+		}
+		end := gs.setPhase(game.GamePhaseHero, recordDur)
+		gs.after(end, game.MessageTypeExpireHero)
+	case game.MessageTypeSubmitPartialTrack:
+		smf, err := smf.ReadFrom(bytes.NewReader(msg.Data))
+		if err != nil {
+			return fmt.Errorf("smf parsing error: '%s'", err)
+		}
+		gs.partials[msg.Player] = smf
+	case game.MessageTypeExpireHero:
+		gs.setPhase(game.GamePhaseJoining, 0)
+		gs.combinePlayerTracks()
+		var buf bytes.Buffer
+		if _, err := gs.state.Rendition.WriteTo(&buf); err != nil {
+			return err
+		}
+		gs.broadcast(game.MessageTypeBroadcastCombinedTrack, buf.Bytes())
+		end := gs.setPhase(game.GamePhasePlayback, playbackDur)
+		gs.after(end, game.MessageTypeExpirePlayback)
+	case game.MessageTypeExpirePlayback:
+		gs.setPhase(game.GamePhaseDone, 0)
+	default:
+		log.Printf("not handling message (type: '%s')", msg.Type.String())
 	}
-	bs := buf.Bytes()
-
-	// playback phase
-	done = gs.setPhase(game.GamePhasePlayback, playbackDur)
-	gs.broadcast(game.MessageTypeBroadcastCombinedTrack, bs)
-	<-done
-
-	// done
-	gs.setPhase(game.GamePhaseDone, 0)
 	return nil
+}
+
+func (gs *GameServer) after(delay <-chan time.Time, msgType game.MessageType) {
+	go func() {
+		<-delay
+		gs.bus <- &game.Message{Type: msgType}
+	}()
 }
 
 func (gs *GameServer) setPhase(phase game.GamePhase, dur time.Duration) <-chan time.Time {

@@ -9,20 +9,23 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[MessageTypeInvalid-0]
-	_ = x[MessageTypeJoin-1]
-	_ = x[MessageTypeLeave-2]
-	_ = x[MessageTypeSubmitPartialTrack-3]
-	_ = x[MessageTypeInitialState-4]
-	_ = x[MessageTypeBroadcastConnectedPlayer-5]
-	_ = x[MessageTypeBroadcastDisconnectedPlayer-6]
-	_ = x[MessageTypeAssignment-7]
-	_ = x[MessageTypeBroadcastPhase-8]
-	_ = x[MessageTypeBroadcastCombinedTrack-9]
+	_ = x[MessageTypeExpireLobby-1]
+	_ = x[MessageTypeExpireHero-2]
+	_ = x[MessageTypeExpirePlayback-3]
+	_ = x[MessageTypeJoin-4]
+	_ = x[MessageTypeLeave-5]
+	_ = x[MessageTypeSubmitPartialTrack-6]
+	_ = x[MessageTypeInitialState-7]
+	_ = x[MessageTypeBroadcastConnectedPlayer-8]
+	_ = x[MessageTypeBroadcastDisconnectedPlayer-9]
+	_ = x[MessageTypeAssignment-10]
+	_ = x[MessageTypeBroadcastPhase-11]
+	_ = x[MessageTypeBroadcastCombinedTrack-12]
 }
 
-const _MessageType_name = "MessageTypeInvalidMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeInitialStateMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastCombinedTrack"
+const _MessageType_name = "MessageTypeInvalidMessageTypeExpireLobbyMessageTypeExpireHeroMessageTypeExpirePlaybackMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeInitialStateMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastCombinedTrack"
 
-var _MessageType_index = [...]uint8{0, 18, 33, 49, 78, 101, 136, 174, 195, 220, 253}
+var _MessageType_index = [...]uint16{0, 18, 40, 61, 86, 101, 117, 146, 169, 204, 242, 263, 288, 321}
 
 func (i MessageType) String() string {
 	if i >= MessageType(len(_MessageType_index)-1) {

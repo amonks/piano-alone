@@ -3,24 +3,25 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"io"
 	"log"
+	"syscall/js"
 
+	"monks.co/piano-alone/game"
 	"monks.co/piano-alone/gameclient"
 	"monks.co/piano-alone/jsws"
-	"monks.co/piano-alone/game"
+	"monks.co/piano-alone/storage"
 )
 
 func main() {
-	go func() {
-		ss := &ScrollingScore{}
-		ss.Start(context.Background())
-	}()
-
-	fingerprint := randomID()
+	fingerprint := storage.Session.Get("fingerprint")
+	if fingerprint == "" {
+		fingerprint = randomID()
+		storage.Session.Set("fingerprint", fingerprint)
+	}
+	log.Printf("fingerprint: %s", fingerprint)
 	wc, err := jsws.Open("ws://localhost:8000/ws?fingerprint=" + fingerprint)
 	if err != nil {
 		panic(err)
@@ -50,8 +51,11 @@ func main() {
 		}
 	}()
 
-	gc := gameclient.New(fingerprint)
-	gc.Start(outbox, inbox)
+	root := js.Global().Get("document").Call("getElementById", "root")
+	gc := gameclient.New(fingerprint, root)
+	if err := gc.Start(outbox, inbox); err != nil {
+		panic(err)
+	}
 }
 
 func randomID() string {
