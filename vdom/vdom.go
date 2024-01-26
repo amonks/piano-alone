@@ -4,15 +4,14 @@ package vdom
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
-	"strings"
+	"sort"
+	"sync"
 	"syscall/js"
 )
 
-const debug = false
-
 type VDOM struct {
+	mu   sync.Mutex
 	root js.Value
 	prev *HTML
 }
@@ -22,6 +21,8 @@ func New(root js.Value) *VDOM {
 }
 
 func (vdom *VDOM) Render(el *HTML) {
+	vdom.mu.Lock()
+	defer vdom.mu.Unlock()
 	if vdom.prev == nil {
 		el.Mount(vdom.root, 0)
 	} else {
@@ -45,17 +46,26 @@ func T(text string, vals ...any) *HTML {
 		text = fmt.Sprintf(text, vals...)
 	}
 	return &HTML{
+		Key:   "TEXT_NODE",
 		Kind:  "TEXT_NODE",
 		Attrs: Obj{"value": text},
 	}
 }
 
-func H(kind string, key string, children ...*HTML) *HTML {
+func TK(text string, key string, vals ...any) *HTML {
+	return T(text, vals...).WithKey(key)
+}
+
+func H(kind string, children ...*HTML) *HTML {
 	return &HTML{
 		Kind:     kind,
-		Key:      key,
+		Key:      kind,
 		Children: children,
 	}
+}
+
+func HK(kind string, key string, children ...*HTML) *HTML {
+	return H(kind, children...).WithKey(key)
 }
 
 func (html *HTML) WithAttr(k string, v any) *HTML {
@@ -67,7 +77,7 @@ func (html *HTML) WithAttr(k string, v any) *HTML {
 }
 
 func (html *HTML) WithKey(k string) *HTML {
-	html.Key = k
+	html.Key = html.Kind + "." + k
 	return html
 }
 
@@ -75,24 +85,14 @@ func (html *HTML) HTML() *HTML {
 	return html
 }
 
-func (html *HTML) Mount(parent js.Value, index int) {
+func (html *HTML) Mount(parent js.Value, index int) js.Value {
 	if html.Kind == "TEXT_NODE" {
-		html.MountText(parent, index)
-		return
+		return html.MountText(parent, index)
 	}
 
 	node := js.Global().Get("document").Call("createElement", html.Kind)
 	for k, v := range html.Attrs {
 		node.Set(k, v)
-	}
-	if debug {
-		var styles []string
-		if s, got := html.Attrs["style"]; got {
-			styles = append(styles, s.(string))
-		}
-		styles = append(styles, fmt.Sprintf("background-color: %s", randomColor()))
-		style := strings.Join(styles, "; ")
-		node.Set("style", style)
 	}
 
 	for i, child := range html.Children {
@@ -101,27 +101,60 @@ func (html *HTML) Mount(parent js.Value, index int) {
 
 	if index == -1 {
 		parent.Call("appendChild", node)
-		return
+		return node
 	}
 
-	numSiblings := parent.Get("childNodes").Get("length").Int()
+	siblingNodes := parent.Get("childNodes")
+	numSiblings := siblingNodes.Get("length").Int()
 	if index >= numSiblings {
 		parent.Call("appendChild", node)
-		return
+		return node
 	}
 
-	nextSibling := parent.Get("childNodes").Index(index + 1)
+	nextSibling := siblingNodes.Index(index + 1)
 	parent.Call("insertBefore", node, nextSibling)
+	return node
 }
 
-func (html *HTML) Update(parent js.Value, self js.Value, prev *HTML) {
-	//
-	// handle updating self
-	//
+type mountedChild struct {
+	parent      js.Value
+	targetIndex int
+	vdom        *HTML
+	node        js.Value
+	isRetained  bool
+}
+
+type mountedChildren []*mountedChild
+
+var _ sort.Interface = mountedChildren{}
+
+func (mc mountedChildren) Len() int           { return len(mc) }
+func (mc mountedChildren) Less(i, j int) bool { return mc[i].targetIndex < mc[j].targetIndex }
+func (mc mountedChildren) Swap(left, right int) {
+	if right < left {
+		left, right = right, left
+	}
+	parent := mc[left].parent
+	sibs := parent.Get("childNodes")
+	var afterLeft js.Value
+	for i := 0; i < sibs.Length(); i++ {
+		if sibs.Index(i).Equal(mc[left].node) {
+			afterLeft = sibs.Index(i + 1)
+			break
+		}
+	}
+	if afterLeft.Equal(mc[right].node) {
+		parent.Call("insertBefore", mc[right].node, mc[left].node)
+		return
+	}
+	parent.Call("replaceChild", mc[left].node, mc[right].node)
+	parent.Call("insertBefore", mc[right].node, afterLeft)
+}
+
+func (html *HTML) Update(parent js.Value, self js.Value, prev *HTML) js.Value {
 
 	if html.Kind == "TEXT_NODE" {
-		html.UpdateText(parent, self, prev)
-		return
+		return html.UpdateText(parent, self, prev)
 	}
 
 	for k := range prev.Attrs {
@@ -134,103 +167,72 @@ func (html *HTML) Update(parent js.Value, self js.Value, prev *HTML) {
 		case js.Func:
 			// special case: never update func attrs, as they are
 			// incomparable
-			if debug {
-				log.Printf("not updating func attr %s", k)
-			}
 		case string:
 			// only update string attrs if they changed
 			if v != prev.Attrs[k] {
-				if debug {
-					log.Printf("updating attr %s", k)
-				}
 				self.Set(k, v)
 			}
 		default:
 			// if we don't know whether an attr is comparable, just
 			// go ahead and try to update it.
-			if debug {
-				log.Printf("updating attr %s", k)
-			}
 			self.Set(k, v)
 		}
 	}
 
-	//
-	// handle recurring on children
-	//
-	// TODO: do a proper "minimal set of edits" sequence comparison algorithm.
-	// The standard one is from this paper:
-	//     https://publications.mpi-cbg.de/Wu_1990_6334.pdf
-	// Here are some implemenattions:
-	//     go: https://github.com/cubicdaiya/gonp
-	//     js; used for vdom: https://github.com/thi-ng/umbrella/blob/develop/packages/diff/src/array.ts#L53
-	//
-
-	// short-circuit: if we have the same sequence of children, skip a
-	// bunch of work and just update them all.
-	shouldShortCircuit := true
-	if len(html.Children) != len(prev.Children) {
-		shouldShortCircuit = false
-	} else {
-		for i, h := range html.Children {
-			if prev.Children[i].Key != h.Key {
-				shouldShortCircuit = false
-				break
-			}
+	domChildren := make(mountedChildren, len(prev.Children))
+	domChildrenByKey := map[string]*mountedChild{}
+	childNodes := self.Get("childNodes")
+	for i, c := range prev.Children {
+		mc := &mountedChild{
+			parent:     self,
+			vdom:       c,
+			node:       childNodes.Index(i),
+			isRetained: false,
 		}
-	}
-	if shouldShortCircuit {
-		nodes := self.Get("childNodes")
-		for i, h := range html.Children {
-			h.Update(self, nodes.Index(i), prev.Children[i])
+		if !mc.node.Truthy() {
+			panic("falsy node")
 		}
-		return
+		domChildrenByKey[c.Key] = mc
+		domChildren[i] = mc
 	}
 
-	// We know that elements need to be created, destroyed, or re-ordered.
-	// Let's do some work.
-
-	// Collect the set of current keys.
-	currKeys := map[string]*HTML{}
-	for _, h := range html.Children {
-		if h.Key != "" {
-			currKeys[h.Key] = h
+	keyset := map[string]struct{}{}
+	for i, c := range html.Children {
+		if _, dupe := keyset[c.Key]; dupe {
+			panic(fmt.Errorf("reused key in '%s': '%s'", html.Key, c.Key))
 		}
+		keyset[c.Key] = struct{}{}
+
+		if mc, hasMC := domChildrenByKey[c.Key]; hasMC {
+			mc.targetIndex = i
+			mc.node = c.Update(self, mc.node, mc.vdom)
+			mc.isRetained = true
+			continue
+		}
+
+		mc := &mountedChild{
+			parent:      self,
+			node:        c.Mount(self, -1),
+			targetIndex: i,
+			isRetained:  true,
+		}
+		domChildren = append(domChildren, mc)
+		domChildrenByKey[c.Key] = mc
 	}
 
-	// Go through the dom and decide what to do with each node: either
-	// update it or delete it.
-	type update struct {
-		prev *HTML
-		node js.Value
-	}
-	toUpdate := map[string]update{}
-	toUnmount := map[*HTML]js.Value{}
-	for i, h := range prev.Children {
-		node := self.Get("childNodes").Index(i)
-		if _, retained := currKeys[h.Key]; retained {
-			toUpdate[h.Key] = update{prev: h, node: node}
+	for i := 0; i < len(domChildren); {
+		c := domChildren[i]
+		if !c.isRetained {
+			self.Call("removeChild", c.node)
+			domChildren = append(domChildren[:i], domChildren[i+1:]...)
 		} else {
-			toUnmount[h] = node
+			i++
 		}
 	}
 
-	// Delete dom nodes we don't need anymore.
-	for _, node := range toUnmount {
-		self.Call("removeChild", node)
-	}
+	sort.Sort(domChildren)
 
-	// Go through the elements that should exist, build or update them as
-	// appropriate.
-	//
-	// BUG: this doesn't always order the children correctly.
-	for i, h := range html.Children {
-		if up, isUpdate := toUpdate[h.Key]; isUpdate {
-			h.Update(self, up.node, up.prev)
-		} else {
-			h.Mount(self, i)
-		}
-	}
+	return self
 }
 
 func (html *HTML) Unmount(parent, self js.Value) {
@@ -242,20 +244,30 @@ func (html *HTML) Unmount(parent, self js.Value) {
 	parent.Call("removeChild", self)
 }
 
-func (html *HTML) MountText(parent js.Value, index int) {
-	parent.Set("innerText", html.Attrs["value"])
+func (html *HTML) MountText(parent js.Value, index int) js.Value {
+	node := js.Global().Get("document").Call("createTextNode", html.Attrs["value"])
+	sibs := parent.Get("childNodes")
+	if index == -1 || index >= sibs.Length()-1 {
+		parent.Call("appendChild", node)
+	} else {
+		parent.Call("insertBefore", node, sibs.Index(index+1))
+	}
+	return node
 }
 
-func (html *HTML) UpdateText(parent js.Value, self js.Value, prev *HTML) {
-	parent.Set("innerText", html.Attrs["value"])
+func (html *HTML) UpdateText(parent js.Value, self js.Value, prev *HTML) js.Value {
+	new, old := html.Attrs["value"], prev.Attrs["value"]
+	if new != old {
+		self.Set("data", new)
+	}
+	return self
 }
 
 func (html *HTML) UnmountText(parent, self js.Value) {
-	parent.Set("innerText", "")
+	parent.Call("removeChild", self)
 }
 
 func randomColor() string {
 	hue := rand.Intn(360)
 	return fmt.Sprintf("hsl(%ddeg, 50%%, 90%%)", hue)
-
 }
