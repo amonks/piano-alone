@@ -93,7 +93,7 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 	return nil
 }
 
-func (c *GameClient) Render() *vdom.HTML {
+func (c *GameClient) Render() vdom.Element {
 	return vdom.H("div",
 		vdom.HK("section", "ui",
 			vdom.H("h1", vdom.T("UI")),
@@ -112,7 +112,7 @@ func (c *GameClient) Render() *vdom.HTML {
 	)
 }
 
-func (c *GameClient) renderUI() *vdom.HTML {
+func (c *GameClient) renderUI() vdom.Element {
 	switch c.state.Phase {
 	case game.GamePhaseHero:
 		if c.myRendition != nil {
@@ -149,13 +149,13 @@ func (c *GameClient) renderPhase() *vdom.HTML {
 	)
 }
 
-func (c *GameClient) renderPlayerList() *vdom.HTML {
+func (c *GameClient) renderPlayerList() vdom.Element {
 	var playerList []string
 	for f := range c.state.Players {
 		playerList = append(playerList, f)
 	}
 	sort.Slice(playerList, func(a, b int) bool { return playerList[a] < playerList[b] })
-	var lis []*vdom.HTML
+	var lis []vdom.Element
 	for _, f := range playerList {
 		player := c.state.Players[f]
 		id := player.Fingerprint[:6]
