@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sort"
 	"syscall/js"
 	"time"
 
 	"gitlab.com/gomidi/midi/v2/smf"
+	"monks.co/piano-alone/abstrack"
 	"monks.co/piano-alone/game"
 	"monks.co/piano-alone/vdom"
 )
@@ -74,12 +74,11 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 	case game.MessageTypeBroadcastDisconnectedPlayer:
 		c.state.Players[string(m.Data)].ConnectionState = game.ConnectionStateDisconnected
 	case game.MessageTypeAssignment:
-		r := bytes.NewReader(m.Data)
-		score, err := smf.ReadFrom(r)
-		if err != nil {
-			return fmt.Errorf("error reading assignment smf: %w", err)
-		}
-		c.myScore = score
+		me := c.state.Players[c.fingerprint]
+		me.Notes = m.Data
+		track := abstrack.FromSMF(c.state.Score.Tracks[0])
+		c.myScore = smf.New()
+		c.myScore.Add(track.Select(me.Notes).ToSMF())
 	case game.MessageTypeBroadcastCombinedTrack:
 		r := bytes.NewReader(m.Data)
 		rendition, err := smf.ReadFrom(r)
@@ -91,85 +90,4 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 		log.Printf("not handling message (type: '%s')", m.Type.String())
 	}
 	return nil
-}
-
-func (c *GameClient) Render() vdom.Element {
-	return vdom.H("div",
-		vdom.HK("section", "ui",
-			vdom.H("h1", vdom.T("UI")),
-			c.renderUI(),
-		),
-		vdom.HK("section", "state",
-			vdom.H("h1", vdom.T("State")),
-			vdom.H("dl",
-				vdom.HK("dt", "phase", vdom.T("Phase")),
-				vdom.HK("dd", "phase", c.renderPhase()),
-
-				vdom.HK("dt", "players", vdom.T("Players")),
-				vdom.HK("dd", "players", c.renderPlayerList()),
-			),
-		),
-	)
-}
-
-func (c *GameClient) renderUI() vdom.Element {
-	switch c.state.Phase {
-	case game.GamePhaseHero:
-		if c.myRendition != nil {
-			return vdom.H("span", vdom.T("already saved rendition"))
-		}
-		if c.myScore == nil {
-			return vdom.H("span", vdom.T("no score"))
-		}
-		return vdom.H("button", vdom.T("submit")).
-			WithAttr("onclick", js.FuncOf(func(js.Value, []js.Value) any {
-				c.myRendition = c.myScore
-
-				var bs bytes.Buffer
-				c.myRendition.WriteTo(&bs)
-				c.send <- &game.Message{
-					Type: game.MessageTypeSubmitPartialTrack,
-					Data: bs.Bytes(),
-				}
-				return nil
-			}))
-	default:
-		return vdom.H("strong")
-	}
-}
-
-func (c *GameClient) renderPhase() *vdom.HTML {
-	if c.state.PhaseExp.IsZero() {
-		return vdom.T(c.state.Phase.String())
-	}
-	return vdom.T(
-		"%s (%s)",
-		c.state.Phase,
-		time.Until(c.state.PhaseExp).Round(time.Second),
-	)
-}
-
-func (c *GameClient) renderPlayerList() vdom.Element {
-	var playerList []string
-	for f := range c.state.Players {
-		playerList = append(playerList, f)
-	}
-	sort.Slice(playerList, func(a, b int) bool { return playerList[a] < playerList[b] })
-	var lis []vdom.Element
-	for _, f := range playerList {
-		player := c.state.Players[f]
-		id := player.Fingerprint[:6]
-		li := vdom.HK("li", id,
-			vdom.H("span", vdom.T(player.Pianist+" ")),
-			vdom.H("code", vdom.T("(%s)", id)),
-		)
-		if player.Fingerprint == c.fingerprint {
-			li = li.WithAttr("style", "color: green")
-		}
-		if player.ConnectionState == game.ConnectionStateDisconnected {
-			li = li.WithAttr("style", "opacity: 0.5")
-		}
-		lis = append(lis, li)
-	}
-	return vdom.H("ul", lis...)
 }

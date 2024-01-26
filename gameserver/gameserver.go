@@ -80,7 +80,11 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 	case game.MessageTypeJoin:
 		shouldStart := gs.state.Players == nil || len(gs.state.Players) == 0
 		if _, got := gs.state.Players[msg.Player]; !got {
-			gs.addPlayer(msg.Player)
+			gs.state.Players[msg.Player] = &game.Player{
+				ConnectionState: game.ConnectionStateConnected,
+				Fingerprint:     msg.Player,
+				Pianist:         pianists.Hash(msg.Player),
+			}
 		}
 		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateConnected
 		gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
@@ -89,13 +93,25 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			end := gs.setPhase(game.GamePhaseLobby, lobbyDur)
 			gs.after(end, game.MessageTypeExpireLobby)
 		}
+		if notes := gs.state.Players[msg.Player].Notes; len(notes) > 0 {
+			gs.sendTo(msg.Player, game.MessageTypeAssignment, notes)
+		}
 	case game.MessageTypeLeave:
 		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
 		gs.broadcast(game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
 	case game.MessageTypeExpireLobby:
-		gs.setPhase(game.GamePhaseSplitting, 0)
-		if err := gs.splitTracksForPlayers(); err != nil {
-			return fmt.Errorf("track splitting error: %s", err)
+		var fingerprints []string
+		for f := range gs.state.Players {
+			fingerprints = append(fingerprints, f)
+		}
+		track := abstrack.FromSMF(gs.state.Score.Tracks[0])
+		notes := track.CountNotes()
+		for i, note := range notes {
+			player := fingerprints[i%len(fingerprints)]
+			gs.state.Players[player].Notes = append(gs.state.Players[player].Notes, note.Key)
+		}
+		for _, player := range gs.state.Players {
+			gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, player.Notes)
 		}
 		end := gs.setPhase(game.GamePhaseHero, recordDur)
 		gs.after(end, game.MessageTypeExpireHero)
@@ -106,8 +122,17 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		}
 		gs.partials[msg.Player] = smf
 	case game.MessageTypeExpireHero:
-		gs.setPhase(game.GamePhaseJoining, 0)
-		gs.combinePlayerTracks()
+		gs.setPhase(game.GamePhaseProcessing, 0)
+		track := abstrack.New()
+		for _, partial := range gs.partials {
+			if partial == nil {
+				continue
+			}
+			track = track.Merge(abstrack.FromSMF(partial.Tracks[0]))
+		}
+		file := smf.New()
+		file.Add(track.ToSMF())
+		gs.state.Rendition = file
 		var buf bytes.Buffer
 		if _, err := gs.state.Rendition.WriteTo(&buf); err != nil {
 			return err
@@ -144,50 +169,6 @@ func (gs *GameServer) setPhase(phase game.GamePhase, dur time.Duration) <-chan t
 	msg := &game.PhaseChangeMessage{Phase: phase, Exp: gs.state.PhaseExp}
 	gs.broadcast(game.MessageTypeBroadcastPhase, msg.Bytes())
 	return time.After(time.Until(gs.state.PhaseExp))
-}
-
-func (gs *GameServer) addPlayer(fingerprint string) {
-	gs.state.Players[fingerprint] = &game.Player{
-		ConnectionState: game.ConnectionStateConnected,
-		Fingerprint:     fingerprint,
-		Pianist:         pianists.Hash(fingerprint),
-	}
-}
-
-func (gs *GameServer) splitTracksForPlayers() error {
-	var fingerprints []string
-	for f := range gs.state.Players {
-		fingerprints = append(fingerprints, f)
-	}
-	track := abstrack.FromSMF(gs.state.Score.Tracks[0])
-	notes := track.CountNotes()
-	for i, note := range notes {
-		player := fingerprints[i%len(fingerprints)]
-		gs.state.Players[player].Notes = append(gs.state.Players[player].Notes, note.Key)
-	}
-	for _, player := range gs.state.Players {
-		split := smf.New()
-		split.Add(track.Select(player.Notes).ToSMF())
-		var buf bytes.Buffer
-		if _, err := split.WriteTo(&buf); err != nil {
-			return err
-		}
-		gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, buf.Bytes())
-	}
-	return nil
-}
-
-func (gs *GameServer) combinePlayerTracks() {
-	track := abstrack.New()
-	for _, partial := range gs.partials {
-		if partial == nil {
-			continue
-		}
-		track = track.Merge(abstrack.FromSMF(partial.Tracks[0]))
-	}
-	file := smf.New()
-	file.Add(track.ToSMF())
-	gs.state.Rendition = file
 }
 
 func (gs *GameServer) broadcast(msgType game.MessageType, data []byte) {

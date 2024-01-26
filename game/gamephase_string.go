@@ -10,16 +10,15 @@ func _() {
 	var x [1]struct{}
 	_ = x[GamePhaseUninitialized-0]
 	_ = x[GamePhaseLobby-1]
-	_ = x[GamePhaseSplitting-2]
-	_ = x[GamePhaseHero-3]
-	_ = x[GamePhaseJoining-4]
-	_ = x[GamePhasePlayback-5]
-	_ = x[GamePhaseDone-6]
+	_ = x[GamePhaseHero-2]
+	_ = x[GamePhaseProcessing-3]
+	_ = x[GamePhasePlayback-4]
+	_ = x[GamePhaseDone-5]
 }
 
-const _GamePhase_name = "GamePhaseUninitializedGamePhaseLobbyGamePhaseSplittingGamePhaseHeroGamePhaseJoiningGamePhasePlaybackGamePhaseDone"
+const _GamePhase_name = "GamePhaseUninitializedGamePhaseLobbyGamePhaseHeroGamePhaseProcessingGamePhasePlaybackGamePhaseDone"
 
-var _GamePhase_index = [...]uint8{0, 22, 36, 54, 67, 83, 100, 113}
+var _GamePhase_index = [...]uint8{0, 22, 36, 49, 68, 85, 98}
 
 func (i GamePhase) String() string {
 	if i >= GamePhase(len(_GamePhase_index)-1) {

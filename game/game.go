@@ -36,9 +36,8 @@ type GamePhase byte
 const (
 	GamePhaseUninitialized GamePhase = iota
 	GamePhaseLobby
-	GamePhaseSplitting
 	GamePhaseHero
-	GamePhaseJoining
+	GamePhaseProcessing
 	GamePhasePlayback
 	GamePhaseDone
 )
@@ -142,31 +141,6 @@ func MessageFromBytes(bs []byte) *Message {
 		panic(err)
 	}
 	return &m
-}
-
-func SelectMessage(c <-chan *Message, pred func(*Message) bool) *Message {
-	for m := range c {
-		if pred(m) {
-			return m
-		}
-	}
-	return nil
-}
-
-func SelectMessageByType(c <-chan *Message, t MessageType) *Message {
-	return SelectMessage(c, func(m *Message) bool { return m.HasType(t) })
-}
-
-func SelectPhaseChangeMessage(c <-chan *Message, p GamePhase) *Message {
-	return SelectMessage(c, func(m *Message) bool { return m.IsPhaseChangeTo(p) })
-}
-
-func (m *Message) HasType(t MessageType) bool {
-	return m.Type == t
-}
-
-func (m *Message) IsPhaseChangeTo(p GamePhase) bool {
-	return m.Type == MessageTypeBroadcastPhase && GamePhase(m.Data[0]) == p
 }
 
 type PhaseChangeMessage struct {
