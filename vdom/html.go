@@ -2,7 +2,6 @@ package vdom
 
 import (
 	"fmt"
-	"math/rand"
 	"sort"
 	"syscall/js"
 )
@@ -12,19 +11,12 @@ type HTML struct {
 	key      string
 	attrs    Obj
 	children []Element
+
+	afterMount    []func(js.Value)
+	beforeUnmount []func(js.Value)
 }
 
-func T(text string, vals ...any) *HTML {
-	if len(vals) > 0 {
-		text = fmt.Sprintf(text, vals...)
-	}
-	return &HTML{
-		key:   "TEXT_NODE",
-		kind:  "TEXT_NODE",
-		attrs: Obj{"value": text},
-	}
-}
-func H(kind string, children ...Element) Element {
+func H(kind string, children ...Element) *HTML {
 	return &HTML{
 		kind:     kind,
 		key:      kind,
@@ -32,16 +24,13 @@ func H(kind string, children ...Element) Element {
 	}
 }
 
-func TK(text string, key string, vals ...any) Element {
-	return T(text, vals...).WithKey(key)
-}
-func HK(kind string, key string, children ...Element) Element {
+func HK(kind string, key string, children ...Element) *HTML {
 	return H(kind, children...).WithKey(key)
 }
 
 var _ Element = &HTML{}
 
-func (html *HTML) WithAttr(k string, v any) Element {
+func (html *HTML) WithAttr(k string, v any) *HTML {
 	if html.attrs == nil {
 		html.attrs = Obj{}
 	}
@@ -53,7 +42,7 @@ func (html *HTML) Attrs() Obj {
 	return html.attrs
 }
 
-func (html *HTML) WithKey(k string) Element {
+func (html *HTML) WithKey(k string) *HTML {
 	html.key = html.kind + "." + k
 	return html
 }
@@ -62,12 +51,35 @@ func (html *HTML) Key() string {
 	return html.key
 }
 
+func (html *HTML) AfterMount(f func(js.Value)) Element {
+	html.afterMount = append(html.afterMount, f)
+	return html
+}
+
+func (html *HTML) handleAfterMount(node js.Value) {
+	for _, f := range html.afterMount {
+		f(node)
+	}
+}
+
+func (html *HTML) handleBeforeUnmount(node js.Value) {
+	for _, f := range html.beforeUnmount {
+		f(node)
+	}
+}
+
+func (html *HTML) BeforeUnmount(f func(js.Value)) Element {
+	html.beforeUnmount = append(html.beforeUnmount, f)
+	return html
+}
+
 func (html *HTML) Mount(parent js.Value, index int) js.Value {
 	if html.kind == "TEXT_NODE" {
 		return html.MountText(parent, index)
 	}
 
 	node := js.Global().Get("document").Call("createElement", html.kind)
+	defer html.handleAfterMount(node)
 	for k, v := range html.attrs {
 		node.Set(k, v)
 	}
@@ -214,6 +226,7 @@ func (html *HTML) Update(parent js.Value, self js.Value, _prev Element) js.Value
 }
 
 func (html *HTML) Unmount(parent, self js.Value) {
+	html.handleBeforeUnmount(self)
 	if html.kind == "TEXT_NODE" {
 		html.UnmountText(parent, self)
 		return
@@ -222,30 +235,3 @@ func (html *HTML) Unmount(parent, self js.Value) {
 	parent.Call("removeChild", self)
 }
 
-func (html *HTML) MountText(parent js.Value, index int) js.Value {
-	node := js.Global().Get("document").Call("createTextNode", html.attrs["value"])
-	sibs := parent.Get("childNodes")
-	if index == -1 || index >= sibs.Length()-1 {
-		parent.Call("appendChild", node)
-	} else {
-		parent.Call("insertBefore", node, sibs.Index(index+1))
-	}
-	return node
-}
-
-func (html *HTML) UpdateText(parent js.Value, self js.Value, prev *HTML) js.Value {
-	new, old := html.attrs["value"], prev.attrs["value"]
-	if new != old {
-		self.Set("data", new)
-	}
-	return self
-}
-
-func (html *HTML) UnmountText(parent, self js.Value) {
-	parent.Call("removeChild", self)
-}
-
-func randomColor() string {
-	hue := rand.Intn(360)
-	return fmt.Sprintf("hsl(%ddeg, 50%%, 90%%)", hue)
-}

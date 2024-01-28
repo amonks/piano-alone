@@ -6,6 +6,7 @@ import (
 	"syscall/js"
 	"time"
 
+	"gitlab.com/gomidi/midi/v2"
 	"monks.co/piano-alone/game"
 	"monks.co/piano-alone/vdom"
 )
@@ -24,6 +25,9 @@ func (c *GameClient) Render() vdom.Element {
 
 				vdom.HK("dt", "players", vdom.T("Players")),
 				vdom.HK("dd", "players", c.renderPlayerList()),
+
+				vdom.HK("dt", "notes", vdom.T("Notes")),
+				vdom.HK("dd", "notes", c.renderNotes()),
 			),
 		),
 	)
@@ -38,6 +42,7 @@ func (c *GameClient) renderUI() vdom.Element {
 		if c.myScore == nil {
 			return vdom.H("span", vdom.T("no score"))
 		}
+		return vdom.C()
 		return vdom.H("button", vdom.T("submit")).
 			WithAttr("onclick", js.FuncOf(func(js.Value, []js.Value) any {
 				c.myRendition = c.myScore
@@ -87,6 +92,19 @@ func (c *GameClient) renderPlayerList() vdom.Element {
 			li = li.WithAttr("style", "opacity: 0.5")
 		}
 		lis = append(lis, li)
+	}
+	return vdom.H("ul", lis...)
+}
+
+func (c *GameClient) renderNotes() vdom.Element {
+	me := c.state.Players[c.fingerprint]
+	if len(me.Notes) == 0 {
+		return vdom.H("span")
+	}
+	var lis []vdom.Element
+	for _, n := range me.Notes {
+		name := midi.Note(n).String()
+		lis = append(lis, vdom.HK("li", name, vdom.T(name)))
 	}
 	return vdom.H("ul", lis...)
 }

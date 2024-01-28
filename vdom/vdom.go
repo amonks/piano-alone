@@ -20,10 +20,7 @@ type Element interface {
 	Update(parent, self js.Value, prev Element) js.Value
 	Unmount(parent, self js.Value)
 
-	WithAttr(k string, v any) Element
 	Attrs() Obj
-
-	WithKey(k string) Element
 	Key() string
 }
 
