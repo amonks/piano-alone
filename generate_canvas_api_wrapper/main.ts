@@ -46,11 +46,15 @@ function main() {
   }
 
   function printProperty(name: string, type: string) {
-    console.log(`func (c2d C2D) Get${toPascal(name)}() ${resolve(type)} {`);
+    console.log(
+      `func (c2d C2D) Get${toPascal(name)}() ${resolveOutput(type)} {`,
+    );
     console.log(`	return js.Value(c2d).Get("${name}")${getter(type)}`);
     console.log(`}`);
     console.log(``);
-    console.log(`func (c2d C2D) Set${toPascal(name)}(val ${resolve(type)}) {`);
+    console.log(
+      `func (c2d C2D) Set${toPascal(name)}(val ${resolveInput(type)}) {`,
+    );
     console.log(`	js.Value(c2d).Set("${name}", val)`);
     console.log(`}`);
     console.log(``);
@@ -58,16 +62,18 @@ function main() {
 
   function printMethods() {
     for (const [name, arities] of Object.entries(methods)) {
-      printArity(name, arities[0]);
+      for (const arity of arities) {
+        printArity(name, arity, arities.length > 1);
+      }
     }
   }
 
-  function printArity(name: string, arity: Arity) {
-    console.log(
-      `func (c2d C2D) ${toPascal(name)}(${plist(arity.parameters)}) ${resolve(
-        arity.return,
-      )} {`,
-    );
+  function printArity(name: string, arity: Arity, useOrdinal: boolean) {
+    const ordinal = useOrdinal ? String(arity.parameters.length) : "";
+    const fullName = toPascal(name) + ordinal + (arity.suffix || "");
+    const params = printParamList(arity.parameters);
+    const ret = resolveOutput(arity.return);
+    console.log(`func (c2d C2D) ${fullName}(${params}) ${ret} {`);
     printCall(name, arity);
     console.log(`}`);
     console.log(``);
@@ -82,14 +88,14 @@ function main() {
     console.log(`	${prefix}js.Value(c2d).Call("${name}"${params})`);
   }
 
-  function plist(parameters: Parameter[]): string {
+  function printParamList(parameters: Parameter[]): string {
     let out: string[] = [];
     for (let i = 0; i < parameters.length; i++) {
       const next = parameters[i + 1];
       const p = parameters[i];
       let s = p.name;
       if (!next || next.type !== p.type) {
-        s += " " + resolve(p.type);
+        s += " " + resolveInput(p.type);
       }
       out.push(s);
     }
@@ -110,7 +116,13 @@ function main() {
     }
   }
 
-  function resolve(name: string): string {
+  function resolveInput(name: string): string {
+    const resolved = resolveOutput(name);
+    if (resolved === "js.Value") return "any";
+    return resolved;
+  }
+
+  function resolveOutput(name: string): string {
     if (unions[name]) return name;
     if (name === "void") return "";
     if (name === "number") return "float64";
@@ -149,16 +161,91 @@ function main() {
   }
 
   function parseMethodDeclaration(decs: ts.Declaration[]): Arity[] {
-    return decs.map((dec) => {
-      const children = dec.getChildren();
-      if (children[0].kind === ts.SyntaxKind.JSDoc) children.shift();
-      const parameters = parseParameters(children[2] as ts.SyntaxList);
-      const returnType = parseReturnType(children[5]);
-      return {
-        parameters: parameters,
-        return: returnType,
-      };
+    return explodeArities(
+      decs.map((dec) => {
+        const children = dec.getChildren();
+        if (children[0].kind === ts.SyntaxKind.JSDoc) children.shift();
+        const parameters = parseParameters(children[2] as ts.SyntaxList);
+        const returnType = parseReturnType(children[5]);
+        return {
+          parameters: parameters,
+          return: returnType,
+        };
+      }),
+    );
+  }
+
+  function explodeArities(arities: Arity[]): Arity[] {
+    const out: Arity[] = [];
+    for (const arity of arities) {
+      const firstOptionalIndex = arity.parameters.findLastIndex((p) =>
+        p.type.endsWith("?"),
+      );
+      for (let i = firstOptionalIndex; i < arity.parameters.length; i++) {
+        out.push({
+          ...arity,
+          parameters: arity.parameters
+            .slice(0, i)
+            .map((p) => ({ name: p.name, type: removeSuffix(p.type, "?") })),
+        });
+      }
+      out.push({
+        ...arity,
+        parameters: arity.parameters
+          .slice(0)
+          .map((p) => ({ name: p.name, type: removeSuffix(p.type, "?") })),
+      });
+    }
+    return dedupeArities(out);
+  }
+
+  function dedupeArities(arities: Arity[]): Arity[] {
+    arities.sort((a, b) => {
+      const ldiff = a.parameters.length - b.parameters.length;
+      if (ldiff !== 0) return ldiff;
+      return JSON.stringify(a.parameters) < JSON.stringify(b.parameters)
+        ? -1
+        : 1;
     });
+    const out: Arity[] = [];
+    let [prev, ...rest] = arities;
+    out.push(prev);
+    for (const arity of rest) {
+      if (identifyArity(arity) === identifyArity(prev)) {
+        continue;
+      }
+      if (arity.parameters.length === prev.parameters.length) {
+        out.pop();
+        out.push({
+          ...prev,
+          suffix: toPascal(prev.parameters.map((p) => p.type).join("-")),
+        });
+        out.push({
+          ...arity,
+          suffix: toPascal(arity.parameters.map((p) => p.type).join("-")),
+        });
+        prev = arity;
+      } else {
+        prev = arity;
+        out.push(arity);
+      }
+    }
+    return out;
+  }
+
+  function last<T>(arr: T[]): T {
+    return arr[arr.length - 1];
+  }
+
+  function identifyArity(arity: Arity): string {
+    return arity.parameters.map((p) => p.type).join(",");
+  }
+
+  function removeSuffix(s: string, suffix: string): string {
+    if (s.endsWith(suffix)) {
+      return s.slice(0, s.length - suffix.length);
+    }
+    return s;
   }
 
   function parseReturnType(syntax: ts.Node): string {
@@ -180,10 +267,14 @@ function main() {
       .getChildren()
       .filter(ts.isParameter);
     return parameters.map((p) => {
-      return {
+      const parsed = {
         name: p.name.getText(),
         type: p.type ? getType(p.type) : "void",
       };
+      if (p.questionToken) {
+        parsed.type += "?";
+      }
+      return parsed;
     });
   }
 
@@ -218,6 +309,7 @@ type Property = string;
 type Arity = {
   parameters: Parameter[];
   return: string;
+  suffix?: string;
 };
 type Parameter = { name: string; type: string };
 
