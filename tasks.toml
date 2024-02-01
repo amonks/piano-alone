@@ -9,7 +9,7 @@
   id = "build-wasm"
   type = "short"
   watch = ["**/*.go"]
-  dependencies = ["generate"]
+  dependencies = ["generate", "generate-canvas-api-wrapper"]
   cmd = "GOOS=js GOARCH=wasm go build -o website/main.wasm ./midihero"
 
 [[task]]
@@ -20,6 +20,7 @@
 [[task]]
   id = "generate-canvas-api-wrapper"
   type = "short"
+  watch = ["generate_canvas_api_wrapper/main.ts", "generate_canvas_api_wrapper/package.json"]
   cmd = """
     cd generate_canvas_api_wrapper
     yarn
