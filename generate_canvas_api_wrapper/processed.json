@@ -1,0 +1,2372 @@
+{
+  "properties": {
+    "canvas": "HTMLCanvasElement",
+    "globalAlpha": "number",
+    "globalCompositeOperation": "GlobalCompositeOperation",
+    "fillStyle": "string | CanvasGradient | CanvasPattern",
+    "strokeStyle": "string | CanvasGradient | CanvasPattern",
+    "filter": "string",
+    "imageSmoothingEnabled": "boolean",
+    "imageSmoothingQuality": "ImageSmoothingQuality",
+    "lineCap": "CanvasLineCap",
+    "lineDashOffset": "number",
+    "lineJoin": "CanvasLineJoin",
+    "lineWidth": "number",
+    "miterLimit": "number",
+    "shadowBlur": "number",
+    "shadowColor": "string",
+    "shadowOffsetX": "number",
+    "shadowOffsetY": "number",
+    "direction": "CanvasDirection",
+    "font": "string",
+    "fontKerning": "CanvasFontKerning",
+    "textAlign": "CanvasTextAlign",
+    "textBaseline": "CanvasTextBaseline"
+  },
+  "methods": {
+    "getContextAttributes": [
+      {
+        "parameters": [],
+        "return": "CanvasRenderingContext2DSettings"
+      }
+    ],
+    "drawImage": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dw",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dw",
+            "type": "number"
+          },
+          {
+            "name": "dh",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "sx",
+            "type": "number"
+          },
+          {
+            "name": "sy",
+            "type": "number"
+          },
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "sx",
+            "type": "number"
+          },
+          {
+            "name": "sy",
+            "type": "number"
+          },
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "sx",
+            "type": "number"
+          },
+          {
+            "name": "sy",
+            "type": "number"
+          },
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dw",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "sx",
+            "type": "number"
+          },
+          {
+            "name": "sy",
+            "type": "number"
+          },
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dw",
+            "type": "number"
+          },
+          {
+            "name": "dh",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "beginPath": [
+      {
+        "parameters": [],
+        "return": "void"
+      }
+    ],
+    "clip": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "fillRule",
+            "type": "CanvasFillRule"
+          }
+        ],
+        "return": "void",
+        "suffix": "CanvasFillRule"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          }
+        ],
+        "return": "void",
+        "suffix": "Path2D"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          },
+          {
+            "name": "fillRule",
+            "type": "CanvasFillRule"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "fill": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "fillRule",
+            "type": "CanvasFillRule"
+          }
+        ],
+        "return": "void",
+        "suffix": "CanvasFillRule"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          }
+        ],
+        "return": "void",
+        "suffix": "Path2D"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          },
+          {
+            "name": "fillRule",
+            "type": "CanvasFillRule"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "isPointInPath": [
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "BooleanKeyword"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "BooleanKeyword",
+        "suffix": "Path2DNumberNumber"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "fillRule",
+            "type": "CanvasFillRule"
+          }
+        ],
+        "return": "BooleanKeyword",
+        "suffix": "NumberNumberCanvasFillRule"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "fillRule",
+            "type": "CanvasFillRule"
+          }
+        ],
+        "return": "BooleanKeyword"
+      }
+    ],
+    "isPointInStroke": [
+      {
+        "parameters": [],
+        "return": "BooleanKeyword"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          }
+        ],
+        "return": "BooleanKeyword",
+        "suffix": "Path2D"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "BooleanKeyword",
+        "suffix": "Number"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "BooleanKeyword",
+        "suffix": "Path2DNumber"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "BooleanKeyword",
+        "suffix": "NumberNumber"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "BooleanKeyword"
+      }
+    ],
+    "stroke": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "createConicGradient": [
+      {
+        "parameters": [],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "startAngle",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "startAngle",
+            "type": "number"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "startAngle",
+            "type": "number"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      }
+    ],
+    "createLinearGradient": [
+      {
+        "parameters": [],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          },
+          {
+            "name": "x1",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          },
+          {
+            "name": "x1",
+            "type": "number"
+          },
+          {
+            "name": "y1",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      }
+    ],
+    "createPattern": [
+      {
+        "parameters": [],
+        "return": "CanvasPattern"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          }
+        ],
+        "return": "CanvasPattern"
+      },
+      {
+        "parameters": [
+          {
+            "name": "image",
+            "type": "CanvasImageSource"
+          },
+          {
+            "name": "repetition",
+            "type": "string"
+          }
+        ],
+        "return": "CanvasPattern"
+      }
+    ],
+    "createRadialGradient": [
+      {
+        "parameters": [],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          },
+          {
+            "name": "r0",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          },
+          {
+            "name": "r0",
+            "type": "number"
+          },
+          {
+            "name": "x1",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          },
+          {
+            "name": "r0",
+            "type": "number"
+          },
+          {
+            "name": "x1",
+            "type": "number"
+          },
+          {
+            "name": "y1",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x0",
+            "type": "number"
+          },
+          {
+            "name": "y0",
+            "type": "number"
+          },
+          {
+            "name": "r0",
+            "type": "number"
+          },
+          {
+            "name": "x1",
+            "type": "number"
+          },
+          {
+            "name": "y1",
+            "type": "number"
+          },
+          {
+            "name": "r1",
+            "type": "number"
+          }
+        ],
+        "return": "CanvasGradient"
+      }
+    ],
+    "createImageData": [
+      {
+        "parameters": [],
+        "return": "ImageData"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          }
+        ],
+        "return": "ImageData"
+      },
+      {
+        "parameters": [
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          }
+        ],
+        "return": "ImageData"
+      },
+      {
+        "parameters": [
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          },
+          {
+            "name": "settings",
+            "type": "ImageDataSettings"
+          }
+        ],
+        "return": "ImageData"
+      }
+    ],
+    "getImageData": [
+      {
+        "parameters": [
+          {
+            "name": "sx",
+            "type": "number"
+          },
+          {
+            "name": "sy",
+            "type": "number"
+          },
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          }
+        ],
+        "return": "ImageData"
+      },
+      {
+        "parameters": [
+          {
+            "name": "sx",
+            "type": "number"
+          },
+          {
+            "name": "sy",
+            "type": "number"
+          },
+          {
+            "name": "sw",
+            "type": "number"
+          },
+          {
+            "name": "sh",
+            "type": "number"
+          },
+          {
+            "name": "settings",
+            "type": "ImageDataSettings"
+          }
+        ],
+        "return": "ImageData"
+      }
+    ],
+    "putImageData": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dirtyX",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dirtyX",
+            "type": "number"
+          },
+          {
+            "name": "dirtyY",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dirtyX",
+            "type": "number"
+          },
+          {
+            "name": "dirtyY",
+            "type": "number"
+          },
+          {
+            "name": "dirtyWidth",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "imagedata",
+            "type": "ImageData"
+          },
+          {
+            "name": "dx",
+            "type": "number"
+          },
+          {
+            "name": "dy",
+            "type": "number"
+          },
+          {
+            "name": "dirtyX",
+            "type": "number"
+          },
+          {
+            "name": "dirtyY",
+            "type": "number"
+          },
+          {
+            "name": "dirtyWidth",
+            "type": "number"
+          },
+          {
+            "name": "dirtyHeight",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "arc": [
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "radius",
+            "type": "number"
+          },
+          {
+            "name": "startAngle",
+            "type": "number"
+          },
+          {
+            "name": "endAngle",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "radius",
+            "type": "number"
+          },
+          {
+            "name": "startAngle",
+            "type": "number"
+          },
+          {
+            "name": "endAngle",
+            "type": "number"
+          },
+          {
+            "name": "counterclockwise",
+            "type": "boolean"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "arcTo": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x1",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x1",
+            "type": "number"
+          },
+          {
+            "name": "y1",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x1",
+            "type": "number"
+          },
+          {
+            "name": "y1",
+            "type": "number"
+          },
+          {
+            "name": "x2",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x1",
+            "type": "number"
+          },
+          {
+            "name": "y1",
+            "type": "number"
+          },
+          {
+            "name": "x2",
+            "type": "number"
+          },
+          {
+            "name": "y2",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x1",
+            "type": "number"
+          },
+          {
+            "name": "y1",
+            "type": "number"
+          },
+          {
+            "name": "x2",
+            "type": "number"
+          },
+          {
+            "name": "y2",
+            "type": "number"
+          },
+          {
+            "name": "radius",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "bezierCurveTo": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cp1x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cp1x",
+            "type": "number"
+          },
+          {
+            "name": "cp1y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cp1x",
+            "type": "number"
+          },
+          {
+            "name": "cp1y",
+            "type": "number"
+          },
+          {
+            "name": "cp2x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cp1x",
+            "type": "number"
+          },
+          {
+            "name": "cp1y",
+            "type": "number"
+          },
+          {
+            "name": "cp2x",
+            "type": "number"
+          },
+          {
+            "name": "cp2y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cp1x",
+            "type": "number"
+          },
+          {
+            "name": "cp1y",
+            "type": "number"
+          },
+          {
+            "name": "cp2x",
+            "type": "number"
+          },
+          {
+            "name": "cp2y",
+            "type": "number"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cp1x",
+            "type": "number"
+          },
+          {
+            "name": "cp1y",
+            "type": "number"
+          },
+          {
+            "name": "cp2x",
+            "type": "number"
+          },
+          {
+            "name": "cp2y",
+            "type": "number"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "closePath": [
+      {
+        "parameters": [],
+        "return": "void"
+      }
+    ],
+    "ellipse": [
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "radiusX",
+            "type": "number"
+          },
+          {
+            "name": "radiusY",
+            "type": "number"
+          },
+          {
+            "name": "rotation",
+            "type": "number"
+          },
+          {
+            "name": "startAngle",
+            "type": "number"
+          },
+          {
+            "name": "endAngle",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "radiusX",
+            "type": "number"
+          },
+          {
+            "name": "radiusY",
+            "type": "number"
+          },
+          {
+            "name": "rotation",
+            "type": "number"
+          },
+          {
+            "name": "startAngle",
+            "type": "number"
+          },
+          {
+            "name": "endAngle",
+            "type": "number"
+          },
+          {
+            "name": "counterclockwise",
+            "type": "boolean"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "lineTo": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "moveTo": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "quadraticCurveTo": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cpx",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cpx",
+            "type": "number"
+          },
+          {
+            "name": "cpy",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cpx",
+            "type": "number"
+          },
+          {
+            "name": "cpy",
+            "type": "number"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "cpx",
+            "type": "number"
+          },
+          {
+            "name": "cpy",
+            "type": "number"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "rect": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          },
+          {
+            "name": "h",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "roundRect": [
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          },
+          {
+            "name": "h",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          },
+          {
+            "name": "h",
+            "type": "number"
+          },
+          {
+            "name": "radii",
+            "type": "number | DOMPointInit | (number | DOMPointInit)[]"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "getLineDash": [
+      {
+        "parameters": [],
+        "return": "ArrayType"
+      }
+    ],
+    "setLineDash": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "segments",
+            "type": "number[]"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "clearRect": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          },
+          {
+            "name": "h",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "fillRect": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          },
+          {
+            "name": "h",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "strokeRect": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "w",
+            "type": "number"
+          },
+          {
+            "name": "h",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "reset": [
+      {
+        "parameters": [],
+        "return": "void"
+      }
+    ],
+    "restore": [
+      {
+        "parameters": [],
+        "return": "void"
+      }
+    ],
+    "save": [
+      {
+        "parameters": [],
+        "return": "void"
+      }
+    ],
+    "fillText": [
+      {
+        "parameters": [
+          {
+            "name": "text",
+            "type": "string"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "text",
+            "type": "string"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "maxWidth",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "measureText": [
+      {
+        "parameters": [],
+        "return": "TextMetrics"
+      },
+      {
+        "parameters": [
+          {
+            "name": "text",
+            "type": "string"
+          }
+        ],
+        "return": "TextMetrics"
+      }
+    ],
+    "strokeText": [
+      {
+        "parameters": [
+          {
+            "name": "text",
+            "type": "string"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "text",
+            "type": "string"
+          },
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          },
+          {
+            "name": "maxWidth",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "getTransform": [
+      {
+        "parameters": [],
+        "return": "DOMMatrix"
+      }
+    ],
+    "resetTransform": [
+      {
+        "parameters": [],
+        "return": "void"
+      }
+    ],
+    "rotate": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "angle",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "scale": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "setTransform": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          }
+        ],
+        "return": "void",
+        "suffix": "Number"
+      },
+      {
+        "parameters": [
+          {
+            "name": "transform",
+            "type": "DOMMatrix2DInit"
+          }
+        ],
+        "return": "void",
+        "suffix": "DOMMatrix2DInit"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          },
+          {
+            "name": "d",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          },
+          {
+            "name": "d",
+            "type": "number"
+          },
+          {
+            "name": "e",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          },
+          {
+            "name": "d",
+            "type": "number"
+          },
+          {
+            "name": "e",
+            "type": "number"
+          },
+          {
+            "name": "f",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "transform": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          },
+          {
+            "name": "d",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          },
+          {
+            "name": "d",
+            "type": "number"
+          },
+          {
+            "name": "e",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "a",
+            "type": "number"
+          },
+          {
+            "name": "b",
+            "type": "number"
+          },
+          {
+            "name": "c",
+            "type": "number"
+          },
+          {
+            "name": "d",
+            "type": "number"
+          },
+          {
+            "name": "e",
+            "type": "number"
+          },
+          {
+            "name": "f",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "translate": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "number"
+          },
+          {
+            "name": "y",
+            "type": "number"
+          }
+        ],
+        "return": "void"
+      }
+    ],
+    "drawFocusIfNeeded": [
+      {
+        "parameters": [],
+        "return": "void"
+      },
+      {
+        "parameters": [
+          {
+            "name": "element",
+            "type": "Element"
+          }
+        ],
+        "return": "void",
+        "suffix": "Element"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          }
+        ],
+        "return": "void",
+        "suffix": "Path2D"
+      },
+      {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "Path2D"
+          },
+          {
+            "name": "element",
+            "type": "Element"
+          }
+        ],
+        "return": "void"
+      }
+    ]
+  },
+  "unions": {
+    "GlobalCompositeOperation": [
+      "\"color\"",
+      "\"color-burn\"",
+      "\"color-dodge\"",
+      "\"copy\"",
+      "\"darken\"",
+      "\"destination-atop\"",
+      "\"destination-in\"",
+      "\"destination-out\"",
+      "\"destination-over\"",
+      "\"difference\"",
+      "\"exclusion\"",
+      "\"hard-light\"",
+      "\"hue\"",
+      "\"lighten\"",
+      "\"lighter\"",
+      "\"luminosity\"",
+      "\"multiply\"",
+      "\"overlay\"",
+      "\"saturation\"",
+      "\"screen\"",
+      "\"soft-light\"",
+      "\"source-atop\"",
+      "\"source-in\"",
+      "\"source-out\"",
+      "\"source-over\"",
+      "\"xor\""
+    ],
+    "CanvasFillRule": [
+      "\"evenodd\"",
+      "\"nonzero\""
+    ],
+    "ImageSmoothingQuality": [
+      "\"high\"",
+      "\"low\"",
+      "\"medium\""
+    ],
+    "CanvasLineCap": [
+      "\"butt\"",
+      "\"round\"",
+      "\"square\""
+    ],
+    "CanvasLineJoin": [
+      "\"round\"",
+      "\"bevel\"",
+      "\"miter\""
+    ],
+    "CanvasDirection": [
+      "\"inherit\"",
+      "\"ltr\"",
+      "\"rtl\""
+    ],
+    "CanvasFontKerning": [
+      "\"auto\"",
+      "\"none\"",
+      "\"normal\""
+    ],
+    "CanvasTextAlign": [
+      "\"center\"",
+      "\"end\"",
+      "\"left\"",
+      "\"right\"",
+      "\"start\""
+    ],
+    "CanvasTextBaseline": [
+      "\"alphabetic\"",
+      "\"bottom\"",
+      "\"hanging\"",
+      "\"ideographic\"",
+      "\"middle\"",
+      "\"top\""
+    ]
+  }
+}
