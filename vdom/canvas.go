@@ -15,7 +15,28 @@ type Canvas struct {
 var _ Element = &Canvas{}
 
 type SceneNode interface {
-	Draw(c2d.C2D)
+	Draw(c2d c2d.C2D, bounds Bounds)
+}
+
+type Bounds struct {
+	X, Y, Width, Height float64
+}
+
+func (b Bounds) Within(other Bounds) Bounds {
+	return Bounds{
+		X:      b.X + other.X,
+		Y:      b.Y + other.Y,
+		Width:  min(b.Width, other.Width),
+		Height: min(b.Height, other.Height),
+	}
+}
+
+var _ SceneNode = SceneNodeFunc(nil)
+
+type SceneNodeFunc func(c2d c2d.C2D, bounds Bounds)
+
+func (f SceneNodeFunc) Draw(c2d c2d.C2D, bounds Bounds) {
+	f(c2d, bounds)
 }
 
 func C(nodes ...SceneNode) *Canvas {
@@ -41,9 +62,9 @@ func (c *Canvas) Mount(parent js.Value, index int) js.Value {
 
 func (c *Canvas) Update(parent, self js.Value, prev Element) js.Value {
 	c2d := c2d.C2D(self.Call("getContext", "2d"))
-	c2d.ClearRect(0, 0, self.Get("width").Float(), self.Get("height").Float())
+	c2d.ClearRect0()
 	for _, n := range c.nodes {
-		n.Draw(c2d)
+		n.Draw(c2d, Bounds{0, 0, self.Get("width").Float(), self.Get("height").Float()})
 	}
 	return self
 }
