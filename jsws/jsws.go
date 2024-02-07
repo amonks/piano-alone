@@ -1,4 +1,4 @@
-//go:build wasm || js
+//go:build js && wasm
 
 // jsws is based on this code:
 //

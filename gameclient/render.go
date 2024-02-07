@@ -1,3 +1,5 @@
+//go:build js && wasm
+
 package gameclient
 
 import (
@@ -43,6 +45,7 @@ func (c *GameClient) renderUI() vdom.Element {
 			return vdom.H("span", vdom.T("no score"))
 		}
 		return vdom.C(vdom.Box(vdom.Bounds{10, 10, 20, 20}))
+
 		return vdom.H("button", vdom.T("submit")).
 			WithAttr("onclick", js.FuncOf(func(js.Value, []js.Value) any {
 				c.myRendition = c.myScore

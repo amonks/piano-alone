@@ -1,4 +1,4 @@
-//go:build wasm || js
+//go:build js && wasm
 
 package vdom
 

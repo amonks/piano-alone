@@ -1,3 +1,5 @@
+//go:build js && wasm
+
 package vdom
 
 import (
@@ -234,4 +236,3 @@ func (html *HTML) Unmount(parent, self js.Value) {
 
 	parent.Call("removeChild", self)
 }
-
