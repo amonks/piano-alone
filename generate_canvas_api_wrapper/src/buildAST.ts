@@ -14,7 +14,7 @@ export function buildAST(): U.AST {
 
   const properties: Record<string, U.Property> = {};
   const methods: Record<string, U.Arity[]> = {};
-  const unions: Record<string, U.string[]> = {};
+  const unions: Record<string, string[]> = {};
 
   const t = checker.getTypeAtLocation(typeNode);
   for (const prop of t.getProperties()) {
