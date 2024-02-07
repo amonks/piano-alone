@@ -1,9 +1,17 @@
 import * as U from "./util";
 
-export function preprocessAST(ast: U.AST): U.AST {
+export function explodeAST(ast: U.AST): U.AST {
   const ret: U.AST = { ...ast, methods: {} };
   for (const [name, arities] of Object.entries(ast.methods)) {
     ret.methods[name] = explodeArities(arities);
+  }
+  return ret;
+}
+
+export function dedupeAST(ast: U.AST): U.AST {
+  const ret: U.AST = { ...ast, methods: {} };
+  for (const [name, arities] of Object.entries(ast.methods)) {
+    ret.methods[name] = dedupeArities(arities);
   }
   return ret;
 }
@@ -14,6 +22,10 @@ function explodeArities(arities: U.Arity[]): U.Arity[] {
     const firstOptionalIndex = arity.parameters.findLastIndex((p) =>
       p.type.endsWith("?"),
     );
+    if (firstOptionalIndex === -1) {
+      out.push(arity);
+      continue;
+    }
     for (let i = firstOptionalIndex; i < arity.parameters.length; i++) {
       out.push({
         ...arity,

@@ -26,7 +26,8 @@
     rm dist/*
     yarn
     yarn tsc
-    node dist/main.js > ../c2d/c2d.go
+    node dist/main.js
+    mv out.go ../c2d/c2d.go
     go fmt ../c2d/c2d.go
     echo "done building wrapper"
   """

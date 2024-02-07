@@ -30,6 +30,6 @@ func Box(b Bounds) SceneNode {
 	return SceneNodeFunc(func(c2d c2d.C2D, bounds Bounds) {
 		c2d.SetLineWidth(1)
 		rect := b.Within(bounds)
-		c2d.StrokeRect4(rect.X, rect.Y, rect.Width, rect.Height)
+		c2d.StrokeRect(rect.X, rect.Y, rect.Width, rect.Height)
 	})
 }

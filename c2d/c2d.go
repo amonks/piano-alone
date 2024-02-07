@@ -184,40 +184,12 @@ func (c2d C2D) GetContextAttributes() js.Value {
 	return js.Value(c2d).Call("getContextAttributes")
 }
 
-func (c2d C2D) DrawImage0() {
-	js.Value(c2d).Call("drawImage")
-}
-
-func (c2d C2D) DrawImage1(image any) {
-	js.Value(c2d).Call("drawImage", image)
-}
-
-func (c2d C2D) DrawImage2(image any, dx float64) {
-	js.Value(c2d).Call("drawImage", image, dx)
-}
-
 func (c2d C2D) DrawImage3(image any, dx, dy float64) {
 	js.Value(c2d).Call("drawImage", image, dx, dy)
 }
 
-func (c2d C2D) DrawImage4(image any, dx, dy, dw float64) {
-	js.Value(c2d).Call("drawImage", image, dx, dy, dw)
-}
-
 func (c2d C2D) DrawImage5(image any, dx, dy, dw, dh float64) {
 	js.Value(c2d).Call("drawImage", image, dx, dy, dw, dh)
-}
-
-func (c2d C2D) DrawImage6(image any, sx, sy, sw, sh, dx float64) {
-	js.Value(c2d).Call("drawImage", image, sx, sy, sw, sh, dx)
-}
-
-func (c2d C2D) DrawImage7(image any, sx, sy, sw, sh, dx, dy float64) {
-	js.Value(c2d).Call("drawImage", image, sx, sy, sw, sh, dx, dy)
-}
-
-func (c2d C2D) DrawImage8(image any, sx, sy, sw, sh, dx, dy, dw float64) {
-	js.Value(c2d).Call("drawImage", image, sx, sy, sw, sh, dx, dy, dw)
 }
 
 func (c2d C2D) DrawImage9(image any, sx, sy, sw, sh, dx, dy, dw, dh float64) {
@@ -276,23 +248,7 @@ func (c2d C2D) IsPointInPath4(path any, x, y float64, fillRule CanvasFillRule) j
 	return js.Value(c2d).Call("isPointInPath", path, x, y, fillRule)
 }
 
-func (c2d C2D) IsPointInStroke0() js.Value {
-	return js.Value(c2d).Call("isPointInStroke")
-}
-
-func (c2d C2D) IsPointInStroke1Path2D(path any) js.Value {
-	return js.Value(c2d).Call("isPointInStroke", path)
-}
-
-func (c2d C2D) IsPointInStroke1Number(x float64) js.Value {
-	return js.Value(c2d).Call("isPointInStroke", x)
-}
-
-func (c2d C2D) IsPointInStroke2Path2DNumber(path any, x float64) js.Value {
-	return js.Value(c2d).Call("isPointInStroke", path, x)
-}
-
-func (c2d C2D) IsPointInStroke2NumberNumber(x, y float64) js.Value {
+func (c2d C2D) IsPointInStroke2(x, y float64) js.Value {
 	return js.Value(c2d).Call("isPointInStroke", x, y)
 }
 
@@ -308,84 +264,20 @@ func (c2d C2D) Stroke1(path any) {
 	js.Value(c2d).Call("stroke", path)
 }
 
-func (c2d C2D) CreateConicGradient0() js.Value {
-	return js.Value(c2d).Call("createConicGradient")
-}
-
-func (c2d C2D) CreateConicGradient1(startAngle float64) js.Value {
-	return js.Value(c2d).Call("createConicGradient", startAngle)
-}
-
-func (c2d C2D) CreateConicGradient2(startAngle, x float64) js.Value {
-	return js.Value(c2d).Call("createConicGradient", startAngle, x)
-}
-
-func (c2d C2D) CreateConicGradient3(startAngle, x, y float64) js.Value {
+func (c2d C2D) CreateConicGradient(startAngle, x, y float64) js.Value {
 	return js.Value(c2d).Call("createConicGradient", startAngle, x, y)
 }
 
-func (c2d C2D) CreateLinearGradient0() js.Value {
-	return js.Value(c2d).Call("createLinearGradient")
-}
-
-func (c2d C2D) CreateLinearGradient1(x0 float64) js.Value {
-	return js.Value(c2d).Call("createLinearGradient", x0)
-}
-
-func (c2d C2D) CreateLinearGradient2(x0, y0 float64) js.Value {
-	return js.Value(c2d).Call("createLinearGradient", x0, y0)
-}
-
-func (c2d C2D) CreateLinearGradient3(x0, y0, x1 float64) js.Value {
-	return js.Value(c2d).Call("createLinearGradient", x0, y0, x1)
-}
-
-func (c2d C2D) CreateLinearGradient4(x0, y0, x1, y1 float64) js.Value {
+func (c2d C2D) CreateLinearGradient(x0, y0, x1, y1 float64) js.Value {
 	return js.Value(c2d).Call("createLinearGradient", x0, y0, x1, y1)
 }
 
-func (c2d C2D) CreatePattern0() js.Value {
-	return js.Value(c2d).Call("createPattern")
-}
-
-func (c2d C2D) CreatePattern1(image any) js.Value {
-	return js.Value(c2d).Call("createPattern", image)
-}
-
-func (c2d C2D) CreatePattern2(image any, repetition string) js.Value {
+func (c2d C2D) CreatePattern(image any, repetition string) js.Value {
 	return js.Value(c2d).Call("createPattern", image, repetition)
 }
 
-func (c2d C2D) CreateRadialGradient0() js.Value {
-	return js.Value(c2d).Call("createRadialGradient")
-}
-
-func (c2d C2D) CreateRadialGradient1(x0 float64) js.Value {
-	return js.Value(c2d).Call("createRadialGradient", x0)
-}
-
-func (c2d C2D) CreateRadialGradient2(x0, y0 float64) js.Value {
-	return js.Value(c2d).Call("createRadialGradient", x0, y0)
-}
-
-func (c2d C2D) CreateRadialGradient3(x0, y0, r0 float64) js.Value {
-	return js.Value(c2d).Call("createRadialGradient", x0, y0, r0)
-}
-
-func (c2d C2D) CreateRadialGradient4(x0, y0, r0, x1 float64) js.Value {
-	return js.Value(c2d).Call("createRadialGradient", x0, y0, r0, x1)
-}
-
-func (c2d C2D) CreateRadialGradient5(x0, y0, r0, x1, y1 float64) js.Value {
-	return js.Value(c2d).Call("createRadialGradient", x0, y0, r0, x1, y1)
-}
-
-func (c2d C2D) CreateRadialGradient6(x0, y0, r0, x1, y1, r1 float64) js.Value {
+func (c2d C2D) CreateRadialGradient(x0, y0, r0, x1, y1, r1 float64) js.Value {
 	return js.Value(c2d).Call("createRadialGradient", x0, y0, r0, x1, y1, r1)
-}
-
-func (c2d C2D) CreateImageData0() js.Value {
-	return js.Value(c2d).Call("createImageData")
 }
 
 func (c2d C2D) CreateImageData1(imagedata any) js.Value {
@@ -408,32 +300,8 @@ func (c2d C2D) GetImageData5(sx, sy, sw, sh float64, settings any) js.Value {
 	return js.Value(c2d).Call("getImageData", sx, sy, sw, sh, settings)
 }
 
-func (c2d C2D) PutImageData0() {
-	js.Value(c2d).Call("putImageData")
-}
-
-func (c2d C2D) PutImageData1(imagedata any) {
-	js.Value(c2d).Call("putImageData", imagedata)
-}
-
-func (c2d C2D) PutImageData2(imagedata any, dx float64) {
-	js.Value(c2d).Call("putImageData", imagedata, dx)
-}
-
 func (c2d C2D) PutImageData3(imagedata any, dx, dy float64) {
 	js.Value(c2d).Call("putImageData", imagedata, dx, dy)
-}
-
-func (c2d C2D) PutImageData4(imagedata any, dx, dy, dirtyX float64) {
-	js.Value(c2d).Call("putImageData", imagedata, dx, dy, dirtyX)
-}
-
-func (c2d C2D) PutImageData5(imagedata any, dx, dy, dirtyX, dirtyY float64) {
-	js.Value(c2d).Call("putImageData", imagedata, dx, dy, dirtyX, dirtyY)
-}
-
-func (c2d C2D) PutImageData6(imagedata any, dx, dy, dirtyX, dirtyY, dirtyWidth float64) {
-	js.Value(c2d).Call("putImageData", imagedata, dx, dy, dirtyX, dirtyY, dirtyWidth)
 }
 
 func (c2d C2D) PutImageData7(imagedata any, dx, dy, dirtyX, dirtyY, dirtyWidth, dirtyHeight float64) {
@@ -448,55 +316,11 @@ func (c2d C2D) Arc6(x, y, radius, startAngle, endAngle float64, counterclockwise
 	js.Value(c2d).Call("arc", x, y, radius, startAngle, endAngle, counterclockwise)
 }
 
-func (c2d C2D) ArcTo0() {
-	js.Value(c2d).Call("arcTo")
-}
-
-func (c2d C2D) ArcTo1(x1 float64) {
-	js.Value(c2d).Call("arcTo", x1)
-}
-
-func (c2d C2D) ArcTo2(x1, y1 float64) {
-	js.Value(c2d).Call("arcTo", x1, y1)
-}
-
-func (c2d C2D) ArcTo3(x1, y1, x2 float64) {
-	js.Value(c2d).Call("arcTo", x1, y1, x2)
-}
-
-func (c2d C2D) ArcTo4(x1, y1, x2, y2 float64) {
-	js.Value(c2d).Call("arcTo", x1, y1, x2, y2)
-}
-
-func (c2d C2D) ArcTo5(x1, y1, x2, y2, radius float64) {
+func (c2d C2D) ArcTo(x1, y1, x2, y2, radius float64) {
 	js.Value(c2d).Call("arcTo", x1, y1, x2, y2, radius)
 }
 
-func (c2d C2D) BezierCurveTo0() {
-	js.Value(c2d).Call("bezierCurveTo")
-}
-
-func (c2d C2D) BezierCurveTo1(cp1x float64) {
-	js.Value(c2d).Call("bezierCurveTo", cp1x)
-}
-
-func (c2d C2D) BezierCurveTo2(cp1x, cp1y float64) {
-	js.Value(c2d).Call("bezierCurveTo", cp1x, cp1y)
-}
-
-func (c2d C2D) BezierCurveTo3(cp1x, cp1y, cp2x float64) {
-	js.Value(c2d).Call("bezierCurveTo", cp1x, cp1y, cp2x)
-}
-
-func (c2d C2D) BezierCurveTo4(cp1x, cp1y, cp2x, cp2y float64) {
-	js.Value(c2d).Call("bezierCurveTo", cp1x, cp1y, cp2x, cp2y)
-}
-
-func (c2d C2D) BezierCurveTo5(cp1x, cp1y, cp2x, cp2y, x float64) {
-	js.Value(c2d).Call("bezierCurveTo", cp1x, cp1y, cp2x, cp2y, x)
-}
-
-func (c2d C2D) BezierCurveTo6(cp1x, cp1y, cp2x, cp2y, x, y float64) {
+func (c2d C2D) BezierCurveTo(cp1x, cp1y, cp2x, cp2y, x, y float64) {
 	js.Value(c2d).Call("bezierCurveTo", cp1x, cp1y, cp2x, cp2y, x, y)
 }
 
@@ -512,67 +336,19 @@ func (c2d C2D) Ellipse8(x, y, radiusX, radiusY, rotation, startAngle, endAngle f
 	js.Value(c2d).Call("ellipse", x, y, radiusX, radiusY, rotation, startAngle, endAngle, counterclockwise)
 }
 
-func (c2d C2D) LineTo0() {
-	js.Value(c2d).Call("lineTo")
-}
-
-func (c2d C2D) LineTo1(x float64) {
-	js.Value(c2d).Call("lineTo", x)
-}
-
-func (c2d C2D) LineTo2(x, y float64) {
+func (c2d C2D) LineTo(x, y float64) {
 	js.Value(c2d).Call("lineTo", x, y)
 }
 
-func (c2d C2D) MoveTo0() {
-	js.Value(c2d).Call("moveTo")
-}
-
-func (c2d C2D) MoveTo1(x float64) {
-	js.Value(c2d).Call("moveTo", x)
-}
-
-func (c2d C2D) MoveTo2(x, y float64) {
+func (c2d C2D) MoveTo(x, y float64) {
 	js.Value(c2d).Call("moveTo", x, y)
 }
 
-func (c2d C2D) QuadraticCurveTo0() {
-	js.Value(c2d).Call("quadraticCurveTo")
-}
-
-func (c2d C2D) QuadraticCurveTo1(cpx float64) {
-	js.Value(c2d).Call("quadraticCurveTo", cpx)
-}
-
-func (c2d C2D) QuadraticCurveTo2(cpx, cpy float64) {
-	js.Value(c2d).Call("quadraticCurveTo", cpx, cpy)
-}
-
-func (c2d C2D) QuadraticCurveTo3(cpx, cpy, x float64) {
-	js.Value(c2d).Call("quadraticCurveTo", cpx, cpy, x)
-}
-
-func (c2d C2D) QuadraticCurveTo4(cpx, cpy, x, y float64) {
+func (c2d C2D) QuadraticCurveTo(cpx, cpy, x, y float64) {
 	js.Value(c2d).Call("quadraticCurveTo", cpx, cpy, x, y)
 }
 
-func (c2d C2D) Rect0() {
-	js.Value(c2d).Call("rect")
-}
-
-func (c2d C2D) Rect1(x float64) {
-	js.Value(c2d).Call("rect", x)
-}
-
-func (c2d C2D) Rect2(x, y float64) {
-	js.Value(c2d).Call("rect", x, y)
-}
-
-func (c2d C2D) Rect3(x, y, w float64) {
-	js.Value(c2d).Call("rect", x, y, w)
-}
-
-func (c2d C2D) Rect4(x, y, w, h float64) {
+func (c2d C2D) Rect(x, y, w, h float64) {
 	js.Value(c2d).Call("rect", x, y, w, h)
 }
 
@@ -588,71 +364,19 @@ func (c2d C2D) GetLineDash() js.Value {
 	return js.Value(c2d).Call("getLineDash")
 }
 
-func (c2d C2D) SetLineDash0() {
-	js.Value(c2d).Call("setLineDash")
-}
-
-func (c2d C2D) SetLineDash1(segments any) {
+func (c2d C2D) SetLineDash(segments any) {
 	js.Value(c2d).Call("setLineDash", segments)
 }
 
-func (c2d C2D) ClearRect0() {
-	js.Value(c2d).Call("clearRect")
-}
-
-func (c2d C2D) ClearRect1(x float64) {
-	js.Value(c2d).Call("clearRect", x)
-}
-
-func (c2d C2D) ClearRect2(x, y float64) {
-	js.Value(c2d).Call("clearRect", x, y)
-}
-
-func (c2d C2D) ClearRect3(x, y, w float64) {
-	js.Value(c2d).Call("clearRect", x, y, w)
-}
-
-func (c2d C2D) ClearRect4(x, y, w, h float64) {
+func (c2d C2D) ClearRect(x, y, w, h float64) {
 	js.Value(c2d).Call("clearRect", x, y, w, h)
 }
 
-func (c2d C2D) FillRect0() {
-	js.Value(c2d).Call("fillRect")
-}
-
-func (c2d C2D) FillRect1(x float64) {
-	js.Value(c2d).Call("fillRect", x)
-}
-
-func (c2d C2D) FillRect2(x, y float64) {
-	js.Value(c2d).Call("fillRect", x, y)
-}
-
-func (c2d C2D) FillRect3(x, y, w float64) {
-	js.Value(c2d).Call("fillRect", x, y, w)
-}
-
-func (c2d C2D) FillRect4(x, y, w, h float64) {
+func (c2d C2D) FillRect(x, y, w, h float64) {
 	js.Value(c2d).Call("fillRect", x, y, w, h)
 }
 
-func (c2d C2D) StrokeRect0() {
-	js.Value(c2d).Call("strokeRect")
-}
-
-func (c2d C2D) StrokeRect1(x float64) {
-	js.Value(c2d).Call("strokeRect", x)
-}
-
-func (c2d C2D) StrokeRect2(x, y float64) {
-	js.Value(c2d).Call("strokeRect", x, y)
-}
-
-func (c2d C2D) StrokeRect3(x, y, w float64) {
-	js.Value(c2d).Call("strokeRect", x, y, w)
-}
-
-func (c2d C2D) StrokeRect4(x, y, w, h float64) {
+func (c2d C2D) StrokeRect(x, y, w, h float64) {
 	js.Value(c2d).Call("strokeRect", x, y, w, h)
 }
 
@@ -676,11 +400,7 @@ func (c2d C2D) FillText4(text string, x, y, maxWidth float64) {
 	js.Value(c2d).Call("fillText", text, x, y, maxWidth)
 }
 
-func (c2d C2D) MeasureText0() js.Value {
-	return js.Value(c2d).Call("measureText")
-}
-
-func (c2d C2D) MeasureText1(text string) js.Value {
+func (c2d C2D) MeasureText(text string) js.Value {
 	return js.Value(c2d).Call("measureText", text)
 }
 
@@ -700,23 +420,11 @@ func (c2d C2D) ResetTransform() {
 	js.Value(c2d).Call("resetTransform")
 }
 
-func (c2d C2D) Rotate0() {
-	js.Value(c2d).Call("rotate")
-}
-
-func (c2d C2D) Rotate1(angle float64) {
+func (c2d C2D) Rotate(angle float64) {
 	js.Value(c2d).Call("rotate", angle)
 }
 
-func (c2d C2D) Scale0() {
-	js.Value(c2d).Call("scale")
-}
-
-func (c2d C2D) Scale1(x float64) {
-	js.Value(c2d).Call("scale", x)
-}
-
-func (c2d C2D) Scale2(x, y float64) {
+func (c2d C2D) Scale(x, y float64) {
 	js.Value(c2d).Call("scale", x, y)
 }
 
@@ -724,84 +432,24 @@ func (c2d C2D) SetTransform0() {
 	js.Value(c2d).Call("setTransform")
 }
 
-func (c2d C2D) SetTransform1Number(a float64) {
-	js.Value(c2d).Call("setTransform", a)
-}
-
-func (c2d C2D) SetTransform1DOMMatrix2DInit(transform any) {
+func (c2d C2D) SetTransform1(transform any) {
 	js.Value(c2d).Call("setTransform", transform)
-}
-
-func (c2d C2D) SetTransform2(a, b float64) {
-	js.Value(c2d).Call("setTransform", a, b)
-}
-
-func (c2d C2D) SetTransform3(a, b, c float64) {
-	js.Value(c2d).Call("setTransform", a, b, c)
-}
-
-func (c2d C2D) SetTransform4(a, b, c, d float64) {
-	js.Value(c2d).Call("setTransform", a, b, c, d)
-}
-
-func (c2d C2D) SetTransform5(a, b, c, d, e float64) {
-	js.Value(c2d).Call("setTransform", a, b, c, d, e)
 }
 
 func (c2d C2D) SetTransform6(a, b, c, d, e, f float64) {
 	js.Value(c2d).Call("setTransform", a, b, c, d, e, f)
 }
 
-func (c2d C2D) Transform0() {
-	js.Value(c2d).Call("transform")
-}
-
-func (c2d C2D) Transform1(a float64) {
-	js.Value(c2d).Call("transform", a)
-}
-
-func (c2d C2D) Transform2(a, b float64) {
-	js.Value(c2d).Call("transform", a, b)
-}
-
-func (c2d C2D) Transform3(a, b, c float64) {
-	js.Value(c2d).Call("transform", a, b, c)
-}
-
-func (c2d C2D) Transform4(a, b, c, d float64) {
-	js.Value(c2d).Call("transform", a, b, c, d)
-}
-
-func (c2d C2D) Transform5(a, b, c, d, e float64) {
-	js.Value(c2d).Call("transform", a, b, c, d, e)
-}
-
-func (c2d C2D) Transform6(a, b, c, d, e, f float64) {
+func (c2d C2D) Transform(a, b, c, d, e, f float64) {
 	js.Value(c2d).Call("transform", a, b, c, d, e, f)
 }
 
-func (c2d C2D) Translate0() {
-	js.Value(c2d).Call("translate")
-}
-
-func (c2d C2D) Translate1(x float64) {
-	js.Value(c2d).Call("translate", x)
-}
-
-func (c2d C2D) Translate2(x, y float64) {
+func (c2d C2D) Translate(x, y float64) {
 	js.Value(c2d).Call("translate", x, y)
 }
 
-func (c2d C2D) DrawFocusIfNeeded0() {
-	js.Value(c2d).Call("drawFocusIfNeeded")
-}
-
-func (c2d C2D) DrawFocusIfNeeded1Element(element any) {
+func (c2d C2D) DrawFocusIfNeeded1(element any) {
 	js.Value(c2d).Call("drawFocusIfNeeded", element)
-}
-
-func (c2d C2D) DrawFocusIfNeeded1Path2D(path any) {
-	js.Value(c2d).Call("drawFocusIfNeeded", path)
 }
 
 func (c2d C2D) DrawFocusIfNeeded2(path any, element any) {

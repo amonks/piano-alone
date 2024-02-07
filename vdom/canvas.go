@@ -62,9 +62,10 @@ func (c *Canvas) Mount(parent js.Value, index int) js.Value {
 
 func (c *Canvas) Update(parent, self js.Value, prev Element) js.Value {
 	c2d := c2d.C2D(self.Call("getContext", "2d"))
-	c2d.ClearRect0()
+	w, h := self.Get("width").Float(), self.Get("height").Float()
+	c2d.ClearRect(0, 0, w, h)
 	for _, n := range c.nodes {
-		n.Draw(c2d, Bounds{0, 0, self.Get("width").Float(), self.Get("height").Float()})
+		n.Draw(c2d, Bounds{0, 0, w, h})
 	}
 	return self
 }
