@@ -3,15 +3,13 @@ package game
 import (
 	"bytes"
 	"encoding/gob"
-	"time"
 
 	"gitlab.com/gomidi/midi/v2/smf"
 )
 
 type State struct {
 	Score     *smf.SMF
-	Phase     GamePhase
-	PhaseExp  time.Time
+	Phase     Phase
 	Players   map[string]*Player
 	Rendition *smf.SMF
 }
@@ -23,24 +21,11 @@ func init() {
 
 func NewState() *State {
 	return &State{
-		Phase:    GamePhaseUninitialized,
-		PhaseExp: time.Time{},
-		Players:  map[string]*Player{},
-		Score:    nil,
+		Phase:   NewPhase(GamePhaseUninitialized),
+		Players: map[string]*Player{},
+		Score:   nil,
 	}
 }
-
-//go:generate go run golang.org/x/tools/cmd/stringer -type=GamePhase
-type GamePhase byte
-
-const (
-	GamePhaseUninitialized GamePhase = iota
-	GamePhaseLobby
-	GamePhaseHero
-	GamePhaseProcessing
-	GamePhasePlayback
-	GamePhaseDone
-)
 
 func StateFromBytes(bs []byte) *State {
 	buf := bytes.NewReader(bs)
@@ -137,30 +122,6 @@ func MessageFromBytes(bs []byte) *Message {
 	buf := bytes.NewReader(bs)
 	dec := gob.NewDecoder(buf)
 	var m Message
-	if err := dec.Decode(&m); err != nil {
-		panic(err)
-	}
-	return &m
-}
-
-type PhaseChangeMessage struct {
-	Phase GamePhase
-	Exp   time.Time
-}
-
-func (m *PhaseChangeMessage) Bytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(m); err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
-
-func PhaseChangeMessageFromBytes(bs []byte) *PhaseChangeMessage {
-	buf := bytes.NewReader(bs)
-	dec := gob.NewDecoder(buf)
-	var m PhaseChangeMessage
 	if err := dec.Decode(&m); err != nil {
 		panic(err)
 	}

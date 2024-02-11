@@ -18,7 +18,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	counts := abstrack.FromSMF(f.Tracks[0]).CountNotes()
+	counts := abstrack.FromSMF(f, 0).CountNotes()
 	for _, key := range counts {
 		fmt.Println(key.Key, key.Count)
 	}

@@ -1,3 +1,5 @@
+// go:bulid js && wasm
+
 package vdom
 
 import (
@@ -6,23 +8,20 @@ import (
 	"monks.co/piano-alone/c2d"
 )
 
-type Canvas struct {
-	key   string
-	attrs Obj
-	nodes []SceneNode
-}
-
-var _ Element = &Canvas{}
-
-type SceneNode interface {
-	Draw(c2d c2d.C2D, bounds Bounds)
-}
-
 type Bounds struct {
 	X, Y, Width, Height float64
 }
 
-func (b Bounds) Within(other Bounds) Bounds {
+func (b Bounds) Proportional(p Bounds) Bounds {
+	return Bounds{
+		X:      b.X + p.X*b.Width,
+		Y:      b.Y + p.Y*b.Height,
+		Width:  b.Width * p.Width,
+		Height: b.Height * p.Height,
+	}
+}
+
+func (b Bounds) Intersection(other Bounds) Bounds {
 	return Bounds{
 		X:      b.X + other.X,
 		Y:      b.Y + other.Y,
@@ -31,13 +30,15 @@ func (b Bounds) Within(other Bounds) Bounds {
 	}
 }
 
-var _ SceneNode = SceneNodeFunc(nil)
-
-type SceneNodeFunc func(c2d c2d.C2D, bounds Bounds)
-
-func (f SceneNodeFunc) Draw(c2d c2d.C2D, bounds Bounds) {
-	f(c2d, bounds)
+type Canvas struct {
+	c2d           c2d.C2D
+	key           string
+	attrs         Obj
+	nodes         []SceneNode
+	width, height float64
 }
+
+var _ Element = &Canvas{}
 
 func C(nodes ...SceneNode) *Canvas {
 	return &Canvas{nodes: nodes}
@@ -57,6 +58,10 @@ func (c *Canvas) Mount(parent js.Value, index int) js.Value {
 	} else {
 		parent.Call("insertBefore", node, sibs.Index(index+1))
 	}
+	bounds := node.Call("getBoundingClientRect")
+	w, h := bounds.Get("width").Float(), bounds.Get("height").Float()
+	node.Set("width", w*2)
+	node.Set("height", h*2)
 	return node
 }
 
@@ -72,4 +77,16 @@ func (c *Canvas) Update(parent, self js.Value, prev Element) js.Value {
 
 func (c *Canvas) Unmount(parent, self js.Value) {
 	parent.Call("removeChild", self)
+}
+
+type SceneNode interface {
+	Draw(c2d c2d.C2D, bounds Bounds)
+}
+
+var _ SceneNode = SceneNodeFunc(nil)
+
+type SceneNodeFunc func(c2d c2d.C2D, bounds Bounds)
+
+func (f SceneNodeFunc) Draw(c2d c2d.C2D, bounds Bounds) {
+	f(c2d, bounds)
 }

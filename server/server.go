@@ -99,7 +99,7 @@ func (s *Server) HandleWebsocket(w http.ResponseWriter, req *http.Request) {
 	}
 	c, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
-		http.Error(w, "ws upgrade error: "+err.Error(), 500)
+		log.Printf("ws upgrade error: %s\n", err.Error())
 		return
 	}
 	s.addConn(fingerprint, c)

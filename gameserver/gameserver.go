@@ -33,18 +33,6 @@ func New() *GameServer {
 	}
 }
 
-func tee(c <-chan *game.Message) <-chan *game.Message {
-	out := make(chan *game.Message)
-	go func() {
-		for m := range c {
-			log.Printf("got: '%s'", m.Type.String())
-			out <- m
-		}
-		close(out)
-	}()
-	return out
-}
-
 func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) {
 	gs.state.Score = song
 	gs.send = send
@@ -104,10 +92,14 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		for f := range gs.state.Players {
 			fingerprints = append(fingerprints, f)
 		}
-		track := abstrack.FromSMF(gs.state.Score.Tracks[0])
+		track := abstrack.FromSMF(gs.state.Score, 0)
 		notes := track.CountNotes()
 		for i, note := range notes {
 			player := fingerprints[i%len(fingerprints)]
+			if len(gs.state.Players[player].Notes) >= 3 {
+				log.Printf("completed assignment with %d unassigned notes", len(notes)-i)
+				break
+			}
 			gs.state.Players[player].Notes = append(gs.state.Players[player].Notes, note.Key)
 		}
 		for _, player := range gs.state.Players {
@@ -128,7 +120,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			if partial == nil {
 				continue
 			}
-			track = track.Merge(abstrack.FromSMF(partial.Tracks[0]))
+			track = track.Merge(abstrack.FromSMF(partial, 0))
 		}
 		file := smf.New()
 		file.Add(track.ToSMF())
@@ -158,17 +150,13 @@ func (gs *GameServer) after(delay <-chan time.Time, msgType game.MessageType) {
 func (gs *GameServer) setPhase(phase game.GamePhase, dur time.Duration) <-chan time.Time {
 	log.Println("phase:", phase)
 	if dur == 0 {
-		gs.state.Phase = phase
-		gs.state.PhaseExp = time.Time{}
-		msg := &game.PhaseChangeMessage{Phase: phase}
-		gs.broadcast(game.MessageTypeBroadcastPhase, msg.Bytes())
+		gs.state.Phase = game.NewPhase(phase)
+		gs.broadcast(game.MessageTypeBroadcastPhase, gs.state.Phase.Bytes())
 		return nil
 	}
-	gs.state.Phase = phase
-	gs.state.PhaseExp = time.Now().Add(dur)
-	msg := &game.PhaseChangeMessage{Phase: phase, Exp: gs.state.PhaseExp}
-	gs.broadcast(game.MessageTypeBroadcastPhase, msg.Bytes())
-	return time.After(time.Until(gs.state.PhaseExp))
+	gs.state.Phase = game.NewPhase(phase).WithExp(time.Now().Add(dur))
+	gs.broadcast(game.MessageTypeBroadcastPhase, gs.state.Phase.Bytes())
+	return time.After(time.Until(gs.state.Phase.Exp))
 }
 
 func (gs *GameServer) broadcast(msgType game.MessageType, data []byte) {

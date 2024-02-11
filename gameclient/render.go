@@ -3,9 +3,8 @@
 package gameclient
 
 import (
-	"bytes"
+	"fmt"
 	"sort"
-	"syscall/js"
 	"time"
 
 	"gitlab.com/gomidi/midi/v2"
@@ -36,7 +35,7 @@ func (c *GameClient) Render() vdom.Element {
 }
 
 func (c *GameClient) renderUI() vdom.Element {
-	switch c.state.Phase {
+	switch c.state.Phase.Type {
 	case game.GamePhaseHero:
 		if c.myRendition != nil {
 			return vdom.H("span", vdom.T("already saved rendition"))
@@ -44,33 +43,48 @@ func (c *GameClient) renderUI() vdom.Element {
 		if c.myScore == nil {
 			return vdom.H("span", vdom.T("no score"))
 		}
-		return vdom.C(vdom.Box(vdom.Bounds{10, 10, 20, 20}))
-
-		return vdom.H("button", vdom.T("submit")).
-			WithAttr("onclick", js.FuncOf(func(js.Value, []js.Value) any {
-				c.myRendition = c.myScore
-
-				var bs bytes.Buffer
-				c.myRendition.WriteTo(&bs)
-				c.send <- &game.Message{
-					Type: game.MessageTypeSubmitPartialTrack,
-					Data: bs.Bytes(),
-				}
-				return nil
-			}))
+		return vdom.C(c.renderCanvas()...)
 	default:
 		return vdom.H("strong")
 	}
 }
 
+func (c *GameClient) renderCanvas() []vdom.SceneNode {
+	out := make([]vdom.SceneNode, len(c.myScore.NoteTracks))
+	sectionHeight := 1.0 / float64(len(c.myScore.NoteTracks))
+	start := time.Since(c.state.Phase.Begin)
+	for i, t := range c.myScore.NoteTracks {
+		notes := []vdom.SceneNode{}
+		for _, e := range t.Track.Events {
+			if e.Timestamp < start {
+				continue
+			}
+			if e.Message.Is(midi.NoteOnMsg) {
+				notes = append(notes, vdom.Fill("black", vdom.Dot(float64(e.Timestamp-start)/1000, 0.5, 5)))
+			} else if e.Message.Is(midi.NoteOffMsg) {
+				notes = append(notes, vdom.Fill("black", vdom.Dot(float64(e.Timestamp-start)/1000, 0.5, 5)))
+			}
+		}
+		children := append(notes,
+			vdom.Box(vdom.Bounds{0, 0, 1, 1}),
+			vdom.Text("48px sans serif", 0, 1, fmt.Sprintf("%d", t.Note)),
+		)
+		out[i] = vdom.NewContainer(
+			vdom.Bounds{X: 0, Y: float64(i) * sectionHeight, Width: 1.0, Height: sectionHeight},
+			children...,
+		)
+	}
+	return out
+}
+
 func (c *GameClient) renderPhase() *vdom.HTML {
-	if c.state.PhaseExp.IsZero() {
-		return vdom.T(c.state.Phase.String())
+	if c.state.Phase.Exp.IsZero() {
+		return vdom.T(c.state.Phase.Type.String())
 	}
 	return vdom.T(
 		"%s (%s)",
 		c.state.Phase,
-		time.Until(c.state.PhaseExp).Round(time.Second),
+		time.Until(c.state.Phase.Exp).Round(time.Second),
 	)
 }
 

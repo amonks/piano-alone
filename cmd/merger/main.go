@@ -33,7 +33,7 @@ func run() error {
 		return fmt.Errorf("error reading '%s': %w", *filenameB, err)
 	}
 
-	mergedTrack := abstrack.FromSMF(smfA.Tracks[0]).Merge(abstrack.FromSMF(smfB.Tracks[0]))
+	mergedTrack := abstrack.FromSMF(smfA, 0).Merge(abstrack.FromSMF(smfB, 0))
 	merged := smf.New()
 	merged.Add(mergedTrack.ToSMF())
 	if err := merged.WriteFile(*filenameOut); err != nil {

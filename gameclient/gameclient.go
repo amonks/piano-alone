@@ -20,7 +20,7 @@ type GameClient struct {
 	send        chan<- *game.Message
 	fingerprint string
 	state       *game.State
-	myScore     *smf.SMF
+	myScore     *Score
 	myRendition *smf.SMF
 	vdom        *vdom.VDOM
 }
@@ -44,9 +44,16 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 		for {
 			select {
 			case <-ctx.Done():
+				cancel()
 				return
-			case <-time.After(time.Second / 10):
+			case <-time.After(time.Second / 60):
+				// start := time.Now()
 				c.vdom.Render(c.Render())
+				// dur := time.Since(start)
+				// if dur != 0 {
+				// 	fps := time.Second / dur
+				// 	log.Printf("fps: %d (render took %s)", fps, dur)
+				// }
 			}
 		}
 	}()
@@ -55,7 +62,6 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 		if err := c.handleMessage(m); err != nil {
 			return fmt.Errorf("error handling message '%s': %w", m.Type, err)
 		}
-		c.vdom.Render(c.Render())
 	}
 	cancel()
 	log.Printf("done")
@@ -67,9 +73,8 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 	case game.MessageTypeInitialState:
 		c.state = game.StateFromBytes(m.Data)
 	case game.MessageTypeBroadcastPhase:
-		msg := game.PhaseChangeMessageFromBytes(m.Data)
-		c.state.Phase = msg.Phase
-		c.state.PhaseExp = msg.Exp
+		msg := game.PhaseFromBytes(m.Data)
+		c.state.Phase = msg
 	case game.MessageTypeBroadcastConnectedPlayer:
 		player := game.PlayerFromBytes(m.Data)
 		c.state.Players[player.Fingerprint] = player
@@ -78,9 +83,7 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 	case game.MessageTypeAssignment:
 		me := c.state.Players[c.fingerprint]
 		me.Notes = m.Data
-		track := abstrack.FromSMF(c.state.Score.Tracks[0])
-		c.myScore = smf.New()
-		c.myScore.Add(track.Select(me.Notes).ToSMF())
+		c.myScore = NewScore(abstrack.FromSMF(c.state.Score, 0).Select(me.Notes))
 	case game.MessageTypeBroadcastCombinedTrack:
 		r := bytes.NewReader(m.Data)
 		rendition, err := smf.ReadFrom(r)
