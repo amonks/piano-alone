@@ -27,6 +27,7 @@ type GameClient struct {
 
 func New(fingerprint string, root js.Value) *GameClient {
 	return &GameClient{
+		state:       game.NewState(),
 		fingerprint: fingerprint,
 		vdom:        vdom.New(root),
 	}

@@ -53,11 +53,16 @@ func FromSMF(file *smf.SMF, trackIndex int) *AbsTrack {
 		now   time.Duration = 0
 	)
 	for i, event := range src {
-		now = now + ticks.Duration(bpm, event.Delta)
+		var dur time.Duration
+		if event.Delta > 0 {
+			dur = ticks.Duration(bpm, event.Delta)
+		}
+		now = now + dur
 		dst[i] = AbsEvent{
 			Timestamp: now,
 			Message:   event.Message,
 		}
+
 		if event.Message.Is(smf.MetaTempoMsg) {
 			event.Message.GetMetaTempo(&bpm)
 		}
@@ -75,6 +80,9 @@ func (at *AbsTrack) ToSMF() smf.Track {
 		now   time.Duration = 0
 	)
 	for i, event := range src {
+		if now > event.Timestamp {
+			panic("something is amiss")
+		}
 		delta := event.Timestamp - now
 		dst[i] = smf.Event{
 			Delta:   ticks.Ticks(bpm, delta),
@@ -111,6 +119,9 @@ func (at *AbsTrack) CountNotes() []CountedKey {
 }
 
 func (at *AbsTrack) Select(notes []uint8) *AbsTrack {
+	if at.Events[0].Timestamp < 0 {
+		panic("invalid track")
+	}
 	noteSet := map[uint8]struct{}{}
 	for _, note := range notes {
 		noteSet[note] = struct{}{}

@@ -35,6 +35,9 @@ func (c *GameClient) Render() vdom.Element {
 }
 
 func (c *GameClient) renderUI() vdom.Element {
+	if c.state == nil {
+		panic("nil state")
+	}
 	switch c.state.Phase.Type {
 	case game.GamePhaseHero:
 		if c.myRendition != nil {
@@ -50,19 +53,35 @@ func (c *GameClient) renderUI() vdom.Element {
 }
 
 func (c *GameClient) renderCanvas() []vdom.SceneNode {
-	out := make([]vdom.SceneNode, len(c.myScore.NoteTracks))
-	sectionHeight := 1.0 / float64(len(c.myScore.NoteTracks))
-	start := time.Since(c.state.Phase.Begin)
+	var (
+		out           = make([]vdom.SceneNode, len(c.myScore.NoteTracks))
+		sectionHeight = 1.0 / float64(len(c.myScore.NoteTracks))
+
+		screenStart = time.Since(c.state.Phase.Begin)
+		screenWidth = time.Second * 10
+		// screenEnd   = screenStart + screenWidth
+	)
 	for i, t := range c.myScore.NoteTracks {
-		notes := []vdom.SceneNode{}
+		var (
+			notes                       = []vdom.SceneNode{}
+			ch, key, vel                uint8
+			noteStart, noteEnd, noteDur time.Duration
+		)
 		for _, e := range t.Track.Events {
-			if e.Timestamp < start {
-				continue
-			}
-			if e.Message.Is(midi.NoteOnMsg) {
-				notes = append(notes, vdom.Fill("black", vdom.Dot(float64(e.Timestamp-start)/1000, 0.5, 5)))
-			} else if e.Message.Is(midi.NoteOffMsg) {
-				notes = append(notes, vdom.Fill("black", vdom.Dot(float64(e.Timestamp-start)/1000, 0.5, 5)))
+			// if e.Timestamp < screenStart || e.Timestamp > screenEnd {
+			// 	continue
+			// }
+			if e.Message.GetNoteStart(&ch, &key, &vel) {
+				noteStart = e.Timestamp - screenStart
+			} else if e.Message.GetNoteEnd(&ch, &key) {
+				noteEnd = e.Timestamp - screenStart
+				noteDur = noteEnd - noteStart
+				notes = append(notes, vdom.Rect(vdom.Bounds{
+					X:      float64(noteStart) / float64(screenWidth),
+					Y:      0.4,
+					Width:  float64(noteDur) / float64(screenWidth),
+					Height: 0.2,
+				}))
 			}
 		}
 		children := append(notes,
@@ -115,6 +134,9 @@ func (c *GameClient) renderPlayerList() vdom.Element {
 
 func (c *GameClient) renderNotes() vdom.Element {
 	me := c.state.Players[c.fingerprint]
+	if me == nil {
+		return vdom.T("")
+	}
 	if len(me.Notes) == 0 {
 		return vdom.H("span")
 	}

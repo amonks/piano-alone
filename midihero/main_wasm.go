@@ -1,4 +1,4 @@
-//go:build wasm || js
+//go:build js && wasm
 
 package main
 
@@ -22,7 +22,7 @@ func main() {
 		storage.Session.Set("fingerprint", fingerprint)
 	}
 	log.Printf("fingerprint: %s", fingerprint)
-	wc, err := jsws.Open("ws://localhost:8000/ws?fingerprint=" + fingerprint)
+	wc, err := jsws.Open("ws://brigid.ss.cx:8000/ws?fingerprint=" + fingerprint)
 	if err != nil {
 		panic(err)
 	}

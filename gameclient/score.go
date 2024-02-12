@@ -18,6 +18,9 @@ type NoteTrack struct {
 }
 
 func NewScore(track *abstrack.AbsTrack) *Score {
+	if track.Events[0].Timestamp < 0 {
+		panic("invalid track")
+	}
 	score := &Score{}
 	notes := track.CountNotes()
 	sort.Slice(notes, func(i, j int) bool {

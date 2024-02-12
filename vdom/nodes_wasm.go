@@ -48,6 +48,14 @@ func Dot(x, y float64, radius int) SceneNodeFunc {
 	})
 }
 
+func Rect(b Bounds) SceneNodeFunc {
+	return SceneNodeFunc(func(c2d c2d.C2D, bounds Bounds) {
+		c2d.SetLineWidth(1)
+		rect := bounds.Proportional(b)
+		c2d.FillRect(rect.X, rect.Y, rect.Width, rect.Height)
+	})
+}
+
 func Box(b Bounds) SceneNodeFunc {
 	return SceneNodeFunc(func(c2d c2d.C2D, bounds Bounds) {
 		c2d.SetLineWidth(1)

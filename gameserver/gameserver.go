@@ -14,7 +14,7 @@ import (
 
 const (
 	lobbyDur    = time.Second * 5
-	recordDur   = time.Second * 50
+	recordDur   = time.Minute*4 + time.Second*15
 	playbackDur = time.Second * 5
 )
 
@@ -96,7 +96,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		notes := track.CountNotes()
 		for i, note := range notes {
 			player := fingerprints[i%len(fingerprints)]
-			if len(gs.state.Players[player].Notes) >= 3 {
+			if len(gs.state.Players[player].Notes) >= 100 {
 				log.Printf("completed assignment with %d unassigned notes", len(notes)-i)
 				break
 			}
