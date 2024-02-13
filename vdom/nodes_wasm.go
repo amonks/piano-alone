@@ -64,16 +64,16 @@ func Box(b Bounds) SceneNodeFunc {
 	})
 }
 
-type Container struct {
+type Group struct {
 	bounds   Bounds
 	children []SceneNode
 }
 
-func NewContainer(b Bounds, children ...SceneNode) *Container {
-	return &Container{bounds: b, children: children}
+func G(b Bounds, children ...SceneNode) *Group {
+	return &Group{bounds: b, children: children}
 }
 
-func (c *Container) Draw(c2d c2d.C2D, bounds Bounds) {
+func (c *Group) Draw(c2d c2d.C2D, bounds Bounds) {
 	for _, child := range c.children {
 		child.Draw(c2d, bounds.Proportional(c.bounds))
 	}

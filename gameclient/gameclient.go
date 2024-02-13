@@ -16,6 +16,11 @@ import (
 	"monks.co/piano-alone/vdom"
 )
 
+const (
+	fps         = 30
+	screenWidth = time.Second * 4
+)
+
 type GameClient struct {
 	send        chan<- *game.Message
 	fingerprint string
@@ -47,14 +52,8 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 			case <-ctx.Done():
 				cancel()
 				return
-			case <-time.After(time.Second / 60):
-				// start := time.Now()
+			case <-time.After(time.Second / fps):
 				c.vdom.Render(c.Render())
-				// dur := time.Since(start)
-				// if dur != 0 {
-				// 	fps := time.Second / dur
-				// 	log.Printf("fps: %d (render took %s)", fps, dur)
-				// }
 			}
 		}
 	}()

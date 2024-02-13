@@ -58,8 +58,8 @@ func (c *GameClient) renderCanvas() []vdom.SceneNode {
 		sectionHeight = 1.0 / float64(len(c.myScore.NoteTracks))
 
 		screenStart = time.Since(c.state.Phase.Begin)
-		screenWidth = time.Second * 10
-		// screenEnd   = screenStart + screenWidth
+		screenWidth = screenWidth
+		screenEnd   = screenStart + screenWidth
 	)
 	for i, t := range c.myScore.NoteTracks {
 		var (
@@ -68,19 +68,22 @@ func (c *GameClient) renderCanvas() []vdom.SceneNode {
 			noteStart, noteEnd, noteDur time.Duration
 		)
 		for _, e := range t.Track.Events {
-			// if e.Timestamp < screenStart || e.Timestamp > screenEnd {
-			// 	continue
-			// }
+			if e.Timestamp < screenStart {
+				continue
+			}
 			if e.Message.GetNoteStart(&ch, &key, &vel) {
+				if e.Timestamp > screenEnd {
+					break
+				}
 				noteStart = e.Timestamp - screenStart
 			} else if e.Message.GetNoteEnd(&ch, &key) {
 				noteEnd = e.Timestamp - screenStart
 				noteDur = noteEnd - noteStart
 				notes = append(notes, vdom.Rect(vdom.Bounds{
 					X:      float64(noteStart) / float64(screenWidth),
-					Y:      0.4,
+					Y:      0,
 					Width:  float64(noteDur) / float64(screenWidth),
-					Height: 0.2,
+					Height: 1,
 				}))
 			}
 		}
@@ -88,7 +91,7 @@ func (c *GameClient) renderCanvas() []vdom.SceneNode {
 			vdom.Box(vdom.Bounds{0, 0, 1, 1}),
 			vdom.Text("48px sans serif", 0, 1, fmt.Sprintf("%d", t.Note)),
 		)
-		out[i] = vdom.NewContainer(
+		out[i] = vdom.G(
 			vdom.Bounds{X: 0, Y: float64(i) * sectionHeight, Width: 1.0, Height: sectionHeight},
 			children...,
 		)

@@ -20,20 +20,8 @@ func New() *AbsTrack {
 	return &AbsTrack{}
 }
 
-func (t *AbsTrack) BPM() float64 {
-	if t.bpm != 0 {
-		return t.bpm
-	}
-	var bpm float64
-	for _, ev := range t.Events {
-		if !ev.Message.Is(smf.MetaTempoMsg) {
-			continue
-		}
-		ev.Message.GetMetaTempo(&bpm)
-		break
-	}
-	t.bpm = bpm
-	return bpm
+func (t *AbsTrack) Dur() time.Duration {
+	return t.Events[len(t.Events)-1].Timestamp
 }
 
 // An AbsEvent is semantically equivalent to an smf.Event, but it represents

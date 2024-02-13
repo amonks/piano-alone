@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	lobbyDur    = time.Second * 5
-	recordDur   = time.Minute*4 + time.Second*15
-	playbackDur = time.Second * 5
+	maxNotesPerPlayer = 3
+	lobbyDur          = time.Second * 5
+	playbackDur       = time.Second * 5
 )
 
 type GameServer struct {
@@ -96,7 +96,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		notes := track.CountNotes()
 		for i, note := range notes {
 			player := fingerprints[i%len(fingerprints)]
-			if len(gs.state.Players[player].Notes) >= 100 {
+			if len(gs.state.Players[player].Notes) >= maxNotesPerPlayer {
 				log.Printf("completed assignment with %d unassigned notes", len(notes)-i)
 				break
 			}
@@ -105,7 +105,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		for _, player := range gs.state.Players {
 			gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, player.Notes)
 		}
-		end := gs.setPhase(game.GamePhaseHero, recordDur)
+		end := gs.setPhase(game.GamePhaseHero, track.Dur())
 		gs.after(end, game.MessageTypeExpireHero)
 	case game.MessageTypeSubmitPartialTrack:
 		smf, err := smf.ReadFrom(bytes.NewReader(msg.Data))

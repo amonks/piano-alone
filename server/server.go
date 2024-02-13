@@ -74,7 +74,7 @@ func (s *Server) Start() error {
 			})
 		}
 	}()
-	f, err := smf.ReadFile("example.mid")
+	f, err := smf.ReadFile("example-2.mid")
 	if err != nil {
 		return err
 	}
