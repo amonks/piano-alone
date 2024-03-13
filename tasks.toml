@@ -1,7 +1,18 @@
 [[task]]
+  id = "build"
+  type = "short"
+  dependencies = ["build-templates", "build-wasm", "generate", "generate-canvas-api-wrapper"]
+  cmd = "go build ./cmd/serve"
+
+[[task]]
+  id = "start"
+  type = "long"
+  cmd = "./serve"
+
+[[task]]
   id = "dev"
   type = "long"
-  dependencies = ["generate", "build-wasm"]
+  dependencies = ["generate", "build-wasm", "build-templates"]
   watch = ["**/*.go"]
   cmd = "go run ./cmd/serve"
 
@@ -17,11 +28,59 @@
   """
 
 [[task]]
+  id = "build-client"
+  type = "short"
+  dependencies = ["generate"]
+  cmd = """
+    set -xeuo pipefail
+
+    CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
+      go build -o macos-client-amd64 ./cmd/piano
+    CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
+      go build -o macos-client-arm64 ./cmd/piano
+
+    lipo \
+      -output ./macos-client-universal \
+      -create ./macos-client-arm64 ./macos-client-amd64
+
+    rm ./macos-client-arm64 ./macos-client-amd64
+
+    codesign \
+      --keychain buildagent \
+      -s 'Developer ID Application: Andrew Monks (89WR6ARSCL)' \
+      --timestamp \
+      --options runtime \
+      ./macos-client-universal
+
+    /usr/bin/ditto -c -k \
+      --keepParent \
+      ./macos-client-universal \
+      ./macos-client-universal.zip
+
+    xcrun notarytool submit \
+      -f json \
+      --apple-id a@monks.co \
+      --team-id 89WR6ARSCL \
+      --password $APP_SPECIFIC_PASSWORD \
+      --wait ./macos-client-universal.zip \
+      2>&1 | tee /tmp/notarization_info.json
+
+    rm macos-client-universal.zip
+
+  """
+
+[[task]]
   id = "build-wasm"
   type = "short"
   watch = ["**/*.go"]
   dependencies = ["generate", "generate-canvas-api-wrapper"]
-  cmd = "GOOS=js GOARCH=wasm go build -o website/main.wasm ./midihero"
+  cmd = "GOOS=js GOARCH=wasm go build -o main.wasm ./midihero"
+
+[[task]]
+  id = "build-templates"
+  type = "short"
+  watch = ["templates/*.templ"]
+  cmd = "go run github.com/a-h/templ/cmd/templ generate"
 
 [[task]]
   id = "generate"

@@ -1,0 +1,82 @@
+html {
+  background: #f7f0e1;
+
+  .display {
+    font-family: eurostile-extended, sans-serif;
+    font-weight: 900;
+    font-style: normal;
+    line-height: 0.8;
+  }
+
+  .mono,
+  code,
+  kbd,
+  pre,
+  a,
+  samp {
+    font-family: attribute-mono;
+    font-weight: 300;
+    font-style: normal;
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  .leading-wicked {
+    line-height: 0.8 !important;
+  }
+
+  .copy {
+    font-family: goudy-old-style, serif;
+    font-weight: 400;
+    font-style: normal;
+
+    strong,
+    .strong {
+      font-weight: 700;
+    }
+
+    em,
+    .em {
+      font-style: italic;
+    }
+  }
+
+  .text-white {
+    color: #f7f0e1 !important;
+  }
+
+  .markdown {
+    h1 {
+      font-size: 2.25rem; /* 36px */
+      line-height: 2.5rem; /* 40px */
+    }
+    h2 {
+      padding-top: 2.5rem;
+      font-size: 1.5rem; /* 24px */
+      line-height: 2rem; /* 32px */
+    }
+    h1,
+    h2 {
+      margin-bottom: 0.4rem;
+    }
+    p,
+    ul,
+    pre,
+    li {
+      margin-bottom: 0.8rem;
+    }
+    pre {
+      margin: 0.8rem -0.8rem;
+      padding: 0.4rem 0.8rem;
+      background-color: rgba(30, 41, 59, 0.1);
+      font-size: 1rem;
+    }
+    ul {
+      margin-left: 2.4rem;
+      list-style-type: disc;
+      list-style-position: outside;
+    }
+  }
+}

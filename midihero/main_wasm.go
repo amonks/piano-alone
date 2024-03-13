@@ -9,6 +9,7 @@ import (
 	"log"
 	"syscall/js"
 
+	"monks.co/piano-alone/baseurl"
 	"monks.co/piano-alone/game"
 	"monks.co/piano-alone/gameclient"
 	"monks.co/piano-alone/jsws"
@@ -16,13 +17,15 @@ import (
 )
 
 func main() {
+	baseURL := baseurl.Discover()
+
 	fingerprint := storage.Session.Get("fingerprint")
 	if fingerprint == "" {
 		fingerprint = randomID()
 		storage.Session.Set("fingerprint", fingerprint)
 	}
 	log.Printf("fingerprint: %s", fingerprint)
-	wc, err := jsws.Open("ws://brigid.ss.cx:8000/ws?fingerprint=" + fingerprint)
+	wc, err := jsws.Open(baseURL.WS("/ws?fingerprint=" + fingerprint))
 	if err != nil {
 		panic(err)
 	}

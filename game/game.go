@@ -87,6 +87,10 @@ type Message struct {
 	Data   []byte
 }
 
+func NewMessage(messageType MessageType, player string, data []byte) *Message {
+	return &Message{messageType, player, data}
+}
+
 //go:generate go run golang.org/x/tools/cmd/stringer -type=MessageType
 type MessageType byte
 
@@ -96,6 +100,8 @@ const (
 	MessageTypeExpireLobby
 	MessageTypeExpireHero
 	MessageTypeExpirePlayback
+
+	MessageTypeControllerJoin
 
 	MessageTypeJoin
 	MessageTypeLeave
@@ -107,6 +113,8 @@ const (
 	MessageTypeAssignment
 	MessageTypeBroadcastPhase
 	MessageTypeBroadcastCombinedTrack
+
+	MessageTypeRestart
 )
 
 func (m *Message) Bytes() []byte {

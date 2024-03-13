@@ -3,6 +3,7 @@ package main
 import (
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/abstrack"
+	"monks.co/piano-alone/songs"
 )
 
 func main() {
@@ -12,10 +13,7 @@ func main() {
 }
 
 func run() error {
-	f, err := smf.ReadFile("example.mid")
-	if err != nil {
-		return err
-	}
+	f := songs.PreludeBergamasqueSMF
 	dst := abstrack.FromSMF(f, 0).Select([]uint8{61, 56, 64})
 	out := smf.New()
 	out.Add(dst.ToSMF())

@@ -40,11 +40,11 @@ func New(fingerprint string, root js.Value) *GameClient {
 
 func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message) error {
 	c.send = send
-	send <- &game.Message{
-		Type:   game.MessageTypeJoin,
-		Player: c.fingerprint,
-		Data:   []byte(c.fingerprint),
-	}
+	send <- game.NewMessage(
+		game.MessageTypeJoin,
+		c.fingerprint,
+		[]byte(c.fingerprint),
+	)
 	ctx, cancel := context.WithCancel(context.TODO())
 	go func() {
 		for {

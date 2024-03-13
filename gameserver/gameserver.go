@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	maxNotesPerPlayer = 3
+	maxNotesPerPlayer = 4
 	lobbyDur          = time.Second * 5
 	playbackDur       = time.Second * 5
 )
@@ -65,6 +65,19 @@ func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message
 
 func (gs *GameServer) handleMessage(msg *game.Message) error {
 	switch msg.Type {
+
+	case game.MessageTypeRestart:
+		score := gs.state.Score
+		gs.state = game.NewState()
+		gs.state.Score = score
+		gs.partials = map[string]*smf.SMF{}
+		gs.broadcast(game.MessageTypeInitialState, gs.state.Bytes())
+		return nil
+
+	case game.MessageTypeControllerJoin:
+		gs.sendTo("controller", game.MessageTypeInitialState, gs.state.Bytes())
+		return nil
+
 	case game.MessageTypeJoin:
 		shouldStart := gs.state.Players == nil || len(gs.state.Players) == 0
 		if _, got := gs.state.Players[msg.Player]; !got {
@@ -84,9 +97,16 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		if notes := gs.state.Players[msg.Player].Notes; len(notes) > 0 {
 			gs.sendTo(msg.Player, game.MessageTypeAssignment, notes)
 		}
+		return nil
+
 	case game.MessageTypeLeave:
+		if _, has := gs.state.Players[msg.Player]; !has {
+			return nil
+		}
 		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
 		gs.broadcast(game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
+		return nil
+
 	case game.MessageTypeExpireLobby:
 		var fingerprints []string
 		for f := range gs.state.Players {
@@ -107,12 +127,16 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		}
 		end := gs.setPhase(game.GamePhaseHero, track.Dur())
 		gs.after(end, game.MessageTypeExpireHero)
+		return nil
+
 	case game.MessageTypeSubmitPartialTrack:
 		smf, err := smf.ReadFrom(bytes.NewReader(msg.Data))
 		if err != nil {
 			return fmt.Errorf("smf parsing error: '%s'", err)
 		}
 		gs.partials[msg.Player] = smf
+		return nil
+
 	case game.MessageTypeExpireHero:
 		gs.setPhase(game.GamePhaseProcessing, 0)
 		track := abstrack.New()
@@ -132,18 +156,22 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		gs.broadcast(game.MessageTypeBroadcastCombinedTrack, buf.Bytes())
 		end := gs.setPhase(game.GamePhasePlayback, playbackDur)
 		gs.after(end, game.MessageTypeExpirePlayback)
+		return nil
+
 	case game.MessageTypeExpirePlayback:
 		gs.setPhase(game.GamePhaseDone, 0)
+		return nil
+
 	default:
 		log.Printf("not handling message (type: '%s')", msg.Type.String())
+		return nil
 	}
-	return nil
 }
 
 func (gs *GameServer) after(delay <-chan time.Time, msgType game.MessageType) {
 	go func() {
 		<-delay
-		gs.bus <- &game.Message{Type: msgType}
+		gs.bus <- game.NewMessage(msgType, "", nil)
 	}()
 }
 
@@ -160,17 +188,9 @@ func (gs *GameServer) setPhase(phase game.GamePhase, dur time.Duration) <-chan t
 }
 
 func (gs *GameServer) broadcast(msgType game.MessageType, data []byte) {
-	gs.send <- &game.Message{
-		Type:   msgType,
-		Player: "*",
-		Data:   data,
-	}
+	gs.send <- game.NewMessage(msgType, "*", data)
 }
 
 func (gs *GameServer) sendTo(fingerprint string, msgType game.MessageType, data []byte) {
-	gs.send <- &game.Message{
-		Type:   msgType,
-		Player: fingerprint,
-		Data:   data,
-	}
+	gs.send <- game.NewMessage(msgType, fingerprint, data)
 }

@@ -1,24 +1,47 @@
 package main
 
 import (
-	"fmt"
+	"context"
 	"log"
-	"net"
 	"net/http"
-	"os"
 
 	"monks.co/piano-alone/server"
+	"monks.co/piano-alone/sigctx"
 )
 
 func main() {
-	addr := "0.0.0.0:8000"
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "err opening port", err)
-		os.Exit(1)
+	ctx := sigctx.New()
+	game := server.New()
+	httpErrs := make(chan error)
+	gameErrs := make(chan error)
+
+	addr := "0.0.0.0:8080"
+	s := &http.Server{
+		Addr:    addr,
+		Handler: game,
 	}
-	fmt.Printf("Listening at %s\n", addr)
-	s := server.New()
-	go s.Start()
-	log.Fatal(http.Serve(listener, s))
+
+	log.Printf("listening on '%s'", addr)
+
+	go func() { gameErrs <- game.Start() }()
+	go func() { httpErrs <- s.ListenAndServe() }()
+	select {
+	case <-ctx.Done():
+		// interrupt: stop http, stop game
+		log.Printf("canceled: %s; shutting down", ctx.Err())
+		s.Shutdown(context.Background())
+		log.Printf("http server stopped")
+		// TODO: stop game
+		log.Printf("game server stopped")
+	case err := <-httpErrs:
+		// http error: stop game
+		log.Printf("http server error: %s; shutting down", err)
+		// TODO: stop game
+		log.Printf("game server stopped")
+	case err := <-gameErrs:
+		// game error: stop http
+		log.Printf("game error: %s; shutting down", err)
+		s.Shutdown(context.Background())
+		log.Printf("http server stopped")
+	}
 }

@@ -1,0 +1,82 @@
+package templates
+
+templ ComingSoon() {
+	@container("coming soon") {
+		@markdown("copy.md")
+	}
+}
+
+templ Download() {
+	@container("download") {
+		@markdown("download.md")
+	}
+}
+
+templ header() {
+	<header class="pb-6 pt-2 md:pt-12 border-b bg-black text-white">
+		<div class="display max-w-2xl px-2 md:pb-4 mx-auto">
+			<h1 class="md:text-7xl text-4xl uppercase">Life Online</h1>
+			<h2 class="md:text-5xl text-2xl mb-6">Piano Telephone</h2>
+		</div>
+		<div class="mono max-w-2xl px-2 mx-auto">
+			<div class="text-xl"><span class="em">by</span> <a href="https://monks.co">Andrew Monks</a></div>
+			<div class="text-xl"><span class="em">streaming on</span> March 23, 2024</div>
+		</div>
+	</header>
+}
+
+templ container(title string) {
+	<!DOCTYPE html>
+	<html>
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width"/>
+			<title>{ title } • piano.computer</title>
+			<link rel="stylesheet" href="https://use.typekit.net/ipj8hpy.css"/>
+			<link rel="stylesheet" href="/style.css"/>
+			<script src="https://cdn.tailwindcss.com"></script>
+		</head>
+		<body>
+			@header()
+			<div class="copy py-6 px-2 max-w-2xl mx-auto text-xl">
+				{ children... }
+			</div>
+		</body>
+	</html>
+}
+
+templ App() {
+	<!DOCTYPE html>
+	<html>
+		<head>
+			<meta charset="utf-8"/>
+			<title>piano.computer</title>
+			<script src="wasm_exec.js"></script>
+			<style>
+				html,
+				body {
+					margin: 0;
+					width: 100%;
+					height: 100%;
+				}
+				canvas {
+					width: 100%;
+					height: 100%;
+				}
+			</style>
+		</head>
+		<body>
+			<div id="root"></div>
+			<script>
+				const go = new Go();
+				WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)
+					.then((result) => {
+						go.run(result.instance);
+					})
+					.catch((error) => {
+						console.error(error);
+					});
+			</script>
+		</body>
+	</html>
+}

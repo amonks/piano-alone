@@ -5,16 +5,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/abstrack"
+	"monks.co/piano-alone/songs"
 )
 
 func TestRoundTrip(t *testing.T) {
-	example, err := smf.ReadFile("../example.mid")
-	require.NoError(t, err)
-
+	example := songs.PreludeBergamasqueSMF
 	converted := abstrack.FromSMF(example, 0).ToSMF()
 	assert.Equal(t, example.Tracks[0], converted)
 }
