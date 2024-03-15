@@ -151,6 +151,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.testMIDI
 		}
 
+		if zone.Get("Modal").InBounds(msg) {
+			m.modal = ""
+			return m, nil
+		}
+
 		if zone.Get("Menu").InBounds(msg) {
 			m.contentInFocus = false
 			return m, nil

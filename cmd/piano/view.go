@@ -130,9 +130,9 @@ func (m model) viewHeader() string {
 }
 
 func (m model) viewModal() string {
-	return modalStyle.Copy().Width(m.width).Height(m.height).Render(
+	return zone.Mark("Modal", modalStyle.Copy().Width(m.width).Height(m.height).Render(
 		modalHeaderStyle.Render(m.modal) + "\n" + modalDismisserStyle.Render("press any key to dismiss"),
-	)
+	))
 }
 
 func (m model) viewMenu() string {
