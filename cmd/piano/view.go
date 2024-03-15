@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 	"monks.co/piano-alone/data"
@@ -122,6 +121,21 @@ func (m model) viewMenu() string {
 	return content.String()
 }
 
+func (m model) viewContent() string {
+	switch menu[m.menuSelectionIndex] {
+	case "Performance Status":
+		return m.viewPerformanceStatus()
+	case "MIDI Configuration":
+		return m.viewMidiOutPorts()
+	case "MIDI Output Test":
+		return m.viewMidiOutputTest()
+	case "Message Log":
+		return m.viewMessageLog()
+	default:
+		return "?"
+	}
+}
+
 func (m model) viewMidiOutPorts() string {
 	var midiOutPorts strings.Builder
 	if len(m.midiOutPorts) == 0 {
@@ -175,8 +189,7 @@ func (m model) viewPerformanceStatus() string {
 			boxHeaderStyle.Render("Performance Status"),
 			"Waiting for players to join.",
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
-			fmt.Sprintf("Connected players: %d", len(m.state.Players)),
-			fmt.Sprintf("Next phase begins in: %s", time.Until(m.state.Phase.Exp)),
+			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 		)
 
 	case game.GamePhaseHero:
@@ -184,8 +197,8 @@ func (m model) viewPerformanceStatus() string {
 			boxHeaderStyle.Render("Performance Status"),
 			"Players are playing.",
 			"",
-			fmt.Sprintf("Connected players: %d", len(m.state.Players)),
-			fmt.Sprintf("Next phase begins in: %s", time.Until(m.state.Phase.Exp)),
+			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
+			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
 		)
 
 	case game.GamePhaseProcessing:
@@ -193,8 +206,8 @@ func (m model) viewPerformanceStatus() string {
 			boxHeaderStyle.Render("Performance Status"),
 			"Processing MIDI from players.",
 			"",
-			fmt.Sprintf("Connected players: %d", len(m.state.Players)),
-			"",
+			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
+			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
 		)
 
 	case game.GamePhasePlayback:
@@ -202,8 +215,8 @@ func (m model) viewPerformanceStatus() string {
 			boxHeaderStyle.Render("Performance Status"),
 			"Playing combined MIDI on disklavier.",
 			"",
-			fmt.Sprintf("Connected players: %d", len(m.state.Players)),
-			"",
+			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
+			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
 		)
 
 	case game.GamePhaseDone:
@@ -211,7 +224,8 @@ func (m model) viewPerformanceStatus() string {
 			boxHeaderStyle.Render("Performance Status"),
 			"The performance is over.",
 			"",
-			fmt.Sprintf("Connected players: %d", len(m.state.Players)),
+			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
+			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
 			"",
 		)
 
@@ -223,17 +237,15 @@ func (m model) viewPerformanceStatus() string {
 	}
 }
 
-func (m model) viewContent() string {
-	switch menu[m.menuSelectionIndex] {
-	case "Performance Status":
-		return m.viewPerformanceStatus()
-	case "MIDI Configuration":
-		return m.viewMidiOutPorts()
-	case "MIDI Output Test":
-		return m.viewMidiOutputTest()
-	default:
-		return "?"
+func (m model) viewMessageLog() string {
+	msgs := make([]string, len(m.log)+1)
+	msgs[0] = boxHeaderStyle.Render("Message Log")
+	for i, m := range m.log {
+		msgs[i+1] = m.String()
 	}
+	return joinVertical(
+		msgs...,
+	)
 }
 
 func (m model) viewStatusbar() string {

@@ -19,12 +19,14 @@ import (
 )
 
 type model struct {
-	baseURL baseurl.BaseURL
-	inbox   <-chan *game.Message
+	baseURL     baseurl.BaseURL
+	isConductor bool
+	inbox       <-chan *game.Message
 
 	ws    *websocket.Conn
 	state *game.State
 	midi  []byte
+	log   []*game.Message
 
 	width  int
 	height int
@@ -33,6 +35,8 @@ type model struct {
 
 	menuSelectionIndex int
 	contentInFocus     bool
+
+	conductorButtonIndex int
 
 	midiOutPorts     midi.OutPorts
 	midiOutPortIndex int
@@ -72,6 +76,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.acceptMessage
 
 	case msgGotWSMessage:
+		m.log = append(m.log, msg)
 		switch msg.Type {
 		case game.MessageTypeInitialState:
 			m.state = game.StateFromBytes(msg.Data)
@@ -88,9 +93,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			fingerprint := string(msg.Data)
 			m.state.Players[fingerprint].ConnectionState = game.ConnectionStateDisconnected
 
+		case game.MessageTypeBroadcastSubmittedTrack:
+			fingerprint := string(msg.Data)
+			if _, ok := m.state.Players[fingerprint]; !ok {
+				m.state.Players[fingerprint] = &game.Player{}
+			}
+			m.state.Players[fingerprint].HasSubmitted = true
+
 		case game.MessageTypeBroadcastCombinedTrack:
 			m.midi = msg.Data
-			return m, m.playSong
+			return m, tea.Batch(
+				m.playSong,
+				m.acceptMessage,
+			)
 		}
 
 		return m, m.acceptMessage
@@ -238,7 +253,7 @@ func (m model) tick() tea.Msg {
 func (m model) acceptMessage() tea.Msg {
 	mt, bs, err := m.ws.ReadMessage()
 	if err != nil {
-		return msgQuit(err.Error())
+		return msgQuit(fmt.Sprintf("msg read error: %s", err.Error()))
 	}
 	switch mt {
 	case websocket.BinaryMessage:

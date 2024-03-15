@@ -3,6 +3,7 @@ package recorder
 import (
 	"bytes"
 	"fmt"
+	"sync"
 	"time"
 
 	"gitlab.com/gomidi/midi/v2"
@@ -11,7 +12,8 @@ import (
 
 // Recorder records notes into a MIDI SMF file.
 type Recorder struct {
-	file   *smf.SMF
+	file *smf.SMF
+	mu   sync.Mutex
 }
 
 func New() *Recorder {
@@ -36,6 +38,9 @@ func Now(msg midi.Message) Event {
 // Record, given a channel full of midi messages, writes them into the SMF
 // until the channel is closed.
 func (r *Recorder) Record(bpm float64, c <-chan Event) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	ticks := r.file.TimeFormat.(smf.MetricTicks)
 
 	var tr smf.Track
@@ -57,6 +62,9 @@ func (r *Recorder) Record(bpm float64, c <-chan Event) {
 }
 
 func (r *Recorder) SMF() (*smf.SMF, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if len(r.file.Tracks) == 0 || !r.file.Tracks[0].IsClosed() {
 		return nil, fmt.Errorf("recorder is not closed")
 	}
@@ -64,6 +72,9 @@ func (r *Recorder) SMF() (*smf.SMF, error) {
 }
 
 func (r *Recorder) Bytes() ([]byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	if !r.file.Tracks[0].IsClosed() {
 		return nil, fmt.Errorf("recorder is not closed")
 	}

@@ -19,6 +19,7 @@ var (
 		"Performance Status",
 		"MIDI Configuration",
 		"MIDI Output Test",
+		"Message Log",
 	}
 )
 

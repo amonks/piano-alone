@@ -1,7 +1,7 @@
 package data
 
 const (
-	CurrentVersion = "1.1.2"
+	CurrentVersion = "1.3.0"
 )
 
 const (
@@ -10,4 +10,5 @@ const (
 	PathPlayerWS             = "GET /ws"
 	PathControllerWS         = "GET /controller-ws"
 	PathRestart              = "POST /restart"
+	PathAdvance              = "POST /advance"
 )

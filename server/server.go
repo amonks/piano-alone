@@ -96,7 +96,7 @@ func (s *Server) Start() error {
 			})
 		}
 	}()
-	f := songs.PreludeBergamasqueSMF
+	f := songs.ExcerptSMF
 	gs.Start(s.outbox, s.inbox, f)
 	return nil
 }
@@ -120,6 +120,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	mux.HandleFunc(data.PathPlayerWS, s.HandlePlayerWebsocket)
 	mux.HandleFunc(data.PathControllerWS, s.HandleControllerWebsocket)
 	mux.HandleFunc(data.PathRestart, s.HandleRestart)
+	mux.HandleFunc(data.PathAdvance, s.HandleAdvance)
 
 	mux.ServeHTTP(w, req)
 }
@@ -141,8 +142,13 @@ func text(t string) http.HandlerFunc {
 var upgrader = websocket.Upgrader{}
 
 func (s *Server) HandleRestart(w http.ResponseWriter, req *http.Request) {
-	log.Printf("-- restart --")
 	s.inbox <- game.NewMessage(game.MessageTypeRestart, "", nil)
+	w.Write([]byte("ok"))
+}
+
+func (s *Server) HandleAdvance(w http.ResponseWriter, req *http.Request) {
+	s.inbox <- game.NewMessage(game.MessageTypeAdvancePhase, "", nil)
+	w.Write([]byte("ok"))
 }
 
 func (s *Server) HandleControllerWebsocket(w http.ResponseWriter, req *http.Request) {

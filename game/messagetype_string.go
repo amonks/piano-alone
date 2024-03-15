@@ -11,23 +11,27 @@ func _() {
 	_ = x[MessageTypeInvalid-0]
 	_ = x[MessageTypeExpireLobby-1]
 	_ = x[MessageTypeExpireHero-2]
-	_ = x[MessageTypeExpirePlayback-3]
-	_ = x[MessageTypeControllerJoin-4]
-	_ = x[MessageTypeJoin-5]
-	_ = x[MessageTypeLeave-6]
-	_ = x[MessageTypeSubmitPartialTrack-7]
-	_ = x[MessageTypeInitialState-8]
-	_ = x[MessageTypeBroadcastConnectedPlayer-9]
-	_ = x[MessageTypeBroadcastDisconnectedPlayer-10]
-	_ = x[MessageTypeAssignment-11]
-	_ = x[MessageTypeBroadcastPhase-12]
+	_ = x[MessageTypeControllerJoin-3]
+	_ = x[MessageTypeJoin-4]
+	_ = x[MessageTypeLeave-5]
+	_ = x[MessageTypeSubmitPartialTrack-6]
+	_ = x[MessageTypeInitialState-7]
+	_ = x[MessageTypeBroadcastConnectedPlayer-8]
+	_ = x[MessageTypeBroadcastDisconnectedPlayer-9]
+	_ = x[MessageTypeAssignment-10]
+	_ = x[MessageTypeBroadcastPhase-11]
+	_ = x[MessageTypeBroadcastSubmittedTrack-12]
 	_ = x[MessageTypeBroadcastCombinedTrack-13]
 	_ = x[MessageTypeRestart-14]
+	_ = x[MessageTypeAdvancePhase-15]
+	_ = x[MessageTypeKey-16]
+	_ = x[MessageTypeHeroReady-17]
+	_ = x[MessageTypeHeroDone-18]
 }
 
-const _MessageType_name = "MessageTypeInvalidMessageTypeExpireLobbyMessageTypeExpireHeroMessageTypeExpirePlaybackMessageTypeControllerJoinMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeInitialStateMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastCombinedTrackMessageTypeRestart"
+const _MessageType_name = "MessageTypeInvalidMessageTypeExpireLobbyMessageTypeExpireHeroMessageTypeControllerJoinMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeInitialStateMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastSubmittedTrackMessageTypeBroadcastCombinedTrackMessageTypeRestartMessageTypeAdvancePhaseMessageTypeKeyMessageTypeHeroReadyMessageTypeHeroDone"
 
-var _MessageType_index = [...]uint16{0, 18, 40, 61, 86, 111, 126, 142, 171, 194, 229, 267, 288, 313, 346, 364}
+var _MessageType_index = [...]uint16{0, 18, 40, 61, 86, 101, 117, 146, 169, 204, 242, 263, 288, 322, 355, 373, 396, 410, 430, 449}
 
 func (i MessageType) String() string {
 	if i >= MessageType(len(_MessageType_index)-1) {

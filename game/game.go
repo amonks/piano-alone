@@ -3,6 +3,7 @@ package game
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 
 	"gitlab.com/gomidi/midi/v2/smf"
 )
@@ -21,10 +22,30 @@ func init() {
 
 func NewState() *State {
 	return &State{
-		Phase:   NewPhase(GamePhaseUninitialized),
+		Phase:   NewPhase(GamePhaseLobby),
 		Players: map[string]*Player{},
 		Score:   nil,
 	}
+}
+
+func (s *State) CountConnectedPlayers() int {
+	n := 0
+	for _, p := range s.Players {
+		if p.ConnectionState == ConnectionStateConnected {
+			n++
+		}
+	}
+	return n
+}
+
+func (s *State) CountSubmittedTracks() int {
+	n := 0
+	for _, p := range s.Players {
+		if p.HasSubmitted {
+			n++
+		}
+	}
+	return n
 }
 
 func StateFromBytes(bs []byte) *State {
@@ -51,6 +72,7 @@ type Player struct {
 	Fingerprint     string
 	Pianist         string
 	Notes           []uint8
+	HasSubmitted    bool
 }
 
 func PlayerFromBytes(bs []byte) *Player {
@@ -99,7 +121,6 @@ const (
 
 	MessageTypeExpireLobby
 	MessageTypeExpireHero
-	MessageTypeExpirePlayback
 
 	MessageTypeControllerJoin
 
@@ -112,10 +133,26 @@ const (
 	MessageTypeBroadcastDisconnectedPlayer
 	MessageTypeAssignment
 	MessageTypeBroadcastPhase
+	MessageTypeBroadcastSubmittedTrack
 	MessageTypeBroadcastCombinedTrack
 
 	MessageTypeRestart
+	MessageTypeAdvancePhase
+
+	MessageTypeKey
+	MessageTypeHeroReady
+	MessageTypeHeroDone
 )
+
+func (m *Message) String() string {
+	switch m.Type {
+	case MessageTypeBroadcastPhase:
+		phase := PhaseFromBytes(m.Data)
+		return fmt.Sprintf("%s: %s [%s]", m.Player, m.Type.String(), phase.Type.String())
+	default:
+		return fmt.Sprintf("%s: %s", m.Player, m.Type.String())
+	}
+}
 
 func (m *Message) Bytes() []byte {
 	var buf bytes.Buffer
