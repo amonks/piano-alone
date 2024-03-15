@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	zone "github.com/lrstanley/bubblezone"
 	"monks.co/piano-alone/data"
 	"monks.co/piano-alone/game"
 )
@@ -106,31 +107,26 @@ var (
 )
 
 func (m model) View() string {
+	return zone.Scan(m.view())
+}
+
+func (m model) view() string {
 	if m.modal != "" {
 		return m.viewModal()
 	}
 
-	menuStyle := boxStyle.Copy().Height(m.height - 4)
-	if !m.contentInFocus {
-		menuStyle = menuStyle.BorderForeground(lipgloss.Color("#FFFFFF"))
-	}
-	menu := menuStyle.Render(m.viewMenu())
-	menuWidth := lipgloss.Width(menu)
-
-	contentStyle := boxStyle.Copy().Height(m.height - 4).Width(m.width - menuWidth - 4)
-	if m.contentInFocus {
-		contentStyle = contentStyle.BorderForeground(lipgloss.Color("#FFFFFF"))
-	}
-	content := contentStyle.Render(m.viewContent())
-
 	return joinVertical(
-		headerStyle.Copy().Width(m.width).Render("LIFE ONLINE: Piano Telephone"),
+		m.viewHeader(),
 		lipgloss.JoinHorizontal(lipgloss.Center,
-			menu,
-			content,
+			m.viewMenu(),
+			m.viewContent(),
 		),
-		statusbarStyle.Copy().Width(m.width).Render(m.viewStatusbar()),
+		m.viewStatusbar(),
 	)
+}
+
+func (m model) viewHeader() string {
+	return headerStyle.Copy().Width(m.width).Render("LIFE ONLINE: Piano Telephone")
 }
 
 func (m model) viewModal() string {
@@ -143,27 +139,37 @@ func (m model) viewMenu() string {
 	content := strings.Builder{}
 	for _, item := range menu {
 		if item == menu[m.menuSelectionIndex] {
-			content.WriteString(focusedMenuItemStyle.Render(item) + "\n")
+			content.WriteString(zone.Mark(item, focusedMenuItemStyle.Render(item)) + "\n")
 		} else {
-			content.WriteString(menuItemStyle.Render(item) + "\n")
+			content.WriteString(zone.Mark(item, menuItemStyle.Render(item)) + "\n")
 		}
 	}
-	return content.String()
+	menuStyle := boxStyle.Copy().Height(m.height - 4)
+	if !m.contentInFocus {
+		menuStyle = menuStyle.BorderForeground(lipgloss.Color("#FFFFFF"))
+	}
+	return zone.Mark("Menu", menuStyle.Render(content.String()))
 }
 
 func (m model) viewContent() string {
+	var content string
 	switch menu[m.menuSelectionIndex] {
 	case "Performance Status":
-		return m.viewPerformanceStatus()
+		content = m.viewPerformanceStatus()
 	case "MIDI Configuration":
-		return m.viewMidiOutPorts()
+		content = m.viewMidiOutPorts()
 	case "MIDI Output Test":
-		return m.viewMidiOutputTest()
+		content = m.viewMidiOutputTest()
 	case "Message Log":
-		return m.viewMessageLog()
+		content = m.viewMessageLog()
 	default:
-		return "?"
+		content = "?"
 	}
+	contentStyle := boxStyle.Copy().Height(m.height - 4).Width(m.width - menuWidth - 2)
+	if m.contentInFocus {
+		contentStyle = contentStyle.BorderForeground(lipgloss.Color("#FFFFFF"))
+	}
+	return zone.Mark("Content", contentStyle.Render(content))
 }
 
 func (m model) viewMidiOutPorts() string {
@@ -173,9 +179,9 @@ func (m model) viewMidiOutPorts() string {
 	} else {
 		for _, p := range m.midiOutPorts {
 			if m.midiOutPorts[m.midiOutPortIndex].String() == p.String() {
-				midiOutPorts.WriteString("* " + p.String() + "\n")
+				midiOutPorts.WriteString(zone.Mark(p.String(), "* "+p.String()) + "\n")
 			} else {
-				midiOutPorts.WriteString("  " + p.String() + "\n")
+				midiOutPorts.WriteString(zone.Mark(p.String(), "  "+p.String()) + "\n")
 			}
 		}
 	}
@@ -194,12 +200,12 @@ func (m model) viewMidiOutputTest() string {
 	}
 	selectedPortMessage := "no MIDI out ports found"
 	if hasMidiOutPort {
-		selectedPortMessage = "selected port: " + m.midiOutPorts[m.midiOutPortIndex].String()
+		selectedPortMessage = "MIDI Port: " + m.midiOutPorts[m.midiOutPortIndex].String()
 	}
 	return joinVertical(
 		boxHeaderStyle.Render("MIDI Output Test"),
 		selectedPortMessage,
-		buttonStyle.Render("Test Midi Output"),
+		zone.Mark("Test MIDI Output", buttonStyle.Render("Test MIDI Output")),
 	)
 }
 
@@ -211,20 +217,26 @@ func (m model) viewPerformanceStatus() string {
 	case game.GamePhaseUninitialized:
 		return joinVertical(
 			boxHeaderStyle.Render("Performance Status"),
+			m.viewSelectedMIDIOutPort(),
 			"Waiting for server operator to start the performance.",
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
+			"",
+			"",
 		)
 	case game.GamePhaseLobby:
 		return joinVertical(
 			boxHeaderStyle.Render("Performance Status"),
+			m.viewSelectedMIDIOutPort(),
 			"Waiting for players to join.",
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
+			"",
 		)
 
 	case game.GamePhaseHero:
 		return joinVertical(
 			boxHeaderStyle.Render("Performance Status"),
+			m.viewSelectedMIDIOutPort(),
 			"Players are playing.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
@@ -234,6 +246,7 @@ func (m model) viewPerformanceStatus() string {
 	case game.GamePhaseProcessing:
 		return joinVertical(
 			boxHeaderStyle.Render("Performance Status"),
+			m.viewSelectedMIDIOutPort(),
 			"Processing MIDI from players.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
@@ -243,6 +256,7 @@ func (m model) viewPerformanceStatus() string {
 	case game.GamePhasePlayback:
 		return joinVertical(
 			boxHeaderStyle.Render("Performance Status"),
+			m.viewSelectedMIDIOutPort(),
 			"Playing combined MIDI on disklavier.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
@@ -252,6 +266,7 @@ func (m model) viewPerformanceStatus() string {
 	case game.GamePhaseDone:
 		return joinVertical(
 			boxHeaderStyle.Render("Performance Status"),
+			m.viewSelectedMIDIOutPort(),
 			"The performance is over.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
@@ -262,9 +277,20 @@ func (m model) viewPerformanceStatus() string {
 	default:
 		return joinVertical(
 			boxHeaderStyle.Render("Performance Status"),
+			m.viewSelectedMIDIOutPort(),
 			"Unknown state. Something is wrong.",
+			"",
+			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
+			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
 		)
 	}
+}
+
+func (m model) viewSelectedMIDIOutPort() string {
+	if len(m.midiOutPorts) <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("MIDI Port: %s", m.midiOutPorts[m.midiOutPortIndex].String())
 }
 
 func (m model) viewMessageLog() string {
@@ -294,9 +320,11 @@ func (m model) viewStatusbar() string {
 	default:
 		msg = fmt.Sprintf("%s is newer, press u to update", m.latestVersion)
 	}
-	return lipgloss.JoinHorizontal(lipgloss.Top,
-		versionStyle.Render(data.CurrentVersion),
-		msgStyle.Copy().Width(m.width-lipgloss.Width(data.CurrentVersion)-2).Render(msg),
+	return statusbarStyle.Copy().Width(m.width).Render(
+		lipgloss.JoinHorizontal(lipgloss.Top,
+			versionStyle.Render(data.CurrentVersion),
+			msgStyle.Copy().Width(m.width-lipgloss.Width(data.CurrentVersion)-2).Render(msg),
+		),
 	)
 }
 

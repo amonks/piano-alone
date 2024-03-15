@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
 	"github.com/inconshreveable/go-update"
+	zone "github.com/lrstanley/bubblezone"
 	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/baseurl"
@@ -128,6 +129,35 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case msgVersion:
 		m.latestVersion = string(msg)
 		return m, nil
+
+	case tea.MouseMsg:
+		for i, label := range menu {
+			if zone.Get(label).InBounds(msg) {
+				m.contentInFocus = false
+				m.menuSelectionIndex = i
+				return m, nil
+			}
+		}
+		for i, port := range m.midiOutPorts {
+			if zone.Get(port.String()).InBounds(msg) {
+				m.contentInFocus = true
+				m.midiOutPortIndex = i
+				return m, nil
+			}
+		}
+
+		if zone.Get("Test MIDI Output").InBounds(msg) {
+			m.contentInFocus = true
+			return m, m.testMIDI
+		}
+
+		if zone.Get("Menu").InBounds(msg) {
+			m.contentInFocus = false
+			return m, nil
+		} else if zone.Get("Content").InBounds(msg) {
+			m.contentInFocus = true
+			return m, nil
+		}
 
 	case tea.KeyMsg:
 		if m.quitting != "" {

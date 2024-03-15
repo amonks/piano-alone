@@ -7,6 +7,7 @@ import (
 	"log"
 
 	tea "github.com/charmbracelet/bubbletea"
+	zone "github.com/lrstanley/bubblezone"
 	"gitlab.com/gomidi/midi/v2"
 	_ "gitlab.com/gomidi/midi/v2/drivers/rtmididrv"
 	"monks.co/piano-alone/baseurl"
@@ -21,12 +22,18 @@ var (
 		"MIDI Output Test",
 		"Message Log",
 	}
+	menuWidth = len("Performance Status") + 4
 )
 
 func main() {
+	zone.NewGlobal()
 	flag.Parse()
 	defer midi.CloseDriver()
-	p := tea.NewProgram(model{baseURL: baseurl.From(*fBaseURL)}, tea.WithAltScreen())
+	p := tea.NewProgram(
+		model{baseURL: baseurl.From(*fBaseURL)},
+		tea.WithAltScreen(),
+		tea.WithMouseCellMotion(),
+	)
 	if m, err := p.Run(); err != nil {
 		log.Fatal(err)
 	} else {
