@@ -31,6 +31,7 @@ type model struct {
 	width  int
 	height int
 
+	modal    string
 	quitting string
 
 	menuSelectionIndex int
@@ -50,6 +51,7 @@ type model struct {
 type (
 	msgTick               time.Time
 	msgQuit               string
+	msgDismissModal       string
 	msgGotMIDIOutputPorts midi.OutPorts
 	msgVersion            string
 	msgGotWSClient        *websocket.Conn
@@ -93,12 +95,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			fingerprint := string(msg.Data)
 			m.state.Players[fingerprint].ConnectionState = game.ConnectionStateDisconnected
 
+		case game.MessageTypeBroadcastControllerModal:
+			m.modal = string(msg.Data)
+
 		case game.MessageTypeBroadcastSubmittedTrack:
-			fingerprint := string(msg.Data)
-			if _, ok := m.state.Players[fingerprint]; !ok {
-				m.state.Players[fingerprint] = &game.Player{}
-			}
-			m.state.Players[fingerprint].HasSubmitted = true
+			m.modal = string(msg.Data)
 
 		case game.MessageTypeBroadcastCombinedTrack:
 			m.midi = msg.Data
@@ -136,6 +137,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.quitting = ""
 				return m, nil
 			}
+		}
+
+		if m.modal != "" {
+			m.modal = ""
+			return m, nil
 		}
 
 		switch msg.String() {

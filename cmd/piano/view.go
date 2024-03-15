@@ -10,82 +10,106 @@ import (
 )
 
 var (
-	highlight  = lipgloss.Color("#CB4B16")
-	highlight2 = lipgloss.Color("#859900")
+	yellow  = lipgloss.Color("#B58900")
+	orange  = lipgloss.Color("#CB4B16")
+	red     = lipgloss.Color("#DC322F")
+	magenta = lipgloss.Color("#D33682")
+	violet  = lipgloss.Color("#6C71C4")
+	blue    = lipgloss.Color("#268BD2")
+	cyan    = lipgloss.Color("#2AA198")
+	green   = lipgloss.Color("#859900")
 
-	faded       = lipgloss.Color("#657b83")
-	background  = lipgloss.Color("#002B36")
-	background2 = lipgloss.Color("#073642")
-	foreground  = lipgloss.Color("#FDF6E3")
+	xxxLight = lipgloss.Color("#FDF6E3") // base3
+	xxLight  = lipgloss.Color("#EEE8D5") // base2
+	xLight   = lipgloss.Color("#93A1A1") // base1
+	light    = lipgloss.Color("#839496") // base0
+	dark     = lipgloss.Color("#657B83") // base00
+	xDark    = lipgloss.Color("#586E75") // base01
+	xxDark   = lipgloss.Color("#073642") // base02
+	xxxDark  = lipgloss.Color("#002B36") // base03
 
-	backgroundStyle = lipgloss.NewStyle().
-			Background(background)
+	modalStyle = lipgloss.NewStyle().
+			Background(xxxLight).
+			Align(lipgloss.Center, lipgloss.Center)
+	modalHeaderStyle = lipgloss.NewStyle().
+				Background(xxxLight).
+				Foreground(xxxDark).
+				Bold(true).
+				Underline(true).
+				Blink(true)
+	modalDismisserStyle = lipgloss.NewStyle().
+				Background(xxxLight).
+				Foreground(xDark)
 
 	pageStyle = lipgloss.NewStyle().
-			Background(background).
-			Foreground(foreground)
+			Background(xxxDark).
+			Foreground(xxxLight)
 
 	contentStyle = lipgloss.NewStyle().
-			Background(background).
-			Foreground(foreground).
+			Background(xxxDark).
+			Foreground(xxxLight).
 			Padding(1, 4)
 	headerStyle = lipgloss.NewStyle().
-			Background(background2).
-			Foreground(highlight).
+			Background(xxDark).
+			Foreground(orange).
 			Align(lipgloss.Center).
 			Bold(true)
 
 	boxStyle = lipgloss.NewStyle().
-			Background(background).
-			Foreground(foreground).
+			Background(xxxDark).
+			Foreground(xxxLight).
 			Border(lipgloss.NormalBorder()).
-			BorderBackground(background).
-			BorderForeground(faded).
+			BorderBackground(xxxDark).
+			BorderForeground(dark).
 			Padding(0, 1)
 	focusedBoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.NormalBorder()).
-			BorderBackground(background).
-			BorderForeground(foreground).
+			BorderBackground(xxxDark).
+			BorderForeground(xxxLight).
 			Padding(0, 1)
 	boxHeaderStyle = lipgloss.NewStyle().
-			Background(background).
-			Foreground(highlight).
+			Background(xxxDark).
+			Foreground(orange).
 			Bold(true)
 
 	menuItemStyle = lipgloss.NewStyle().
-			Background(background).
-			Foreground(foreground)
+			Background(xxxDark).
+			Foreground(xxxLight)
 	focusedMenuItemStyle = lipgloss.NewStyle().
-				Background(background).
-				Foreground(highlight)
+				Background(xxxDark).
+				Foreground(orange)
 
 	statusbarStyle = lipgloss.NewStyle().
-			Background(background2).
-			Foreground(foreground)
+			Background(xxDark).
+			Foreground(xxxLight)
 	versionStyle = lipgloss.NewStyle().
-			Background(background2).
-			Foreground(foreground).
+			Background(xxDark).
+			Foreground(xxxLight).
 			Padding(0, 1).
 			Width(lipgloss.Width(data.CurrentVersion) + 2)
 	msgStyle = lipgloss.NewStyle().
-			Background(background2).
-			Foreground(foreground).
+			Background(xxDark).
+			Foreground(xxxLight).
 			Align(lipgloss.Right).
 			Padding(0, 1)
 
 	buttonStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("#93A1A1")).
-			Foreground(background).
+			Foreground(xxxDark).
 			Padding(0, 3).
 			MarginTop(1)
 	activeButtonStyle = buttonStyle.Copy().
 				Background(lipgloss.Color("#FDF6E3")).
-				Foreground(background2).
+				Foreground(xxDark).
 				MarginRight(2).
 				Underline(true)
 )
 
 func (m model) View() string {
+	if m.modal != "" {
+		return m.viewModal()
+	}
+
 	menuStyle := boxStyle.Copy().Height(m.height - 4)
 	if !m.contentInFocus {
 		menuStyle = menuStyle.BorderForeground(lipgloss.Color("#FFFFFF"))
@@ -106,6 +130,12 @@ func (m model) View() string {
 			content,
 		),
 		statusbarStyle.Copy().Width(m.width).Render(m.viewStatusbar()),
+	)
+}
+
+func (m model) viewModal() string {
+	return modalStyle.Copy().Width(m.width).Height(m.height).Render(
+		modalHeaderStyle.Render(m.modal) + "\n" + modalDismisserStyle.Render("press any key to dismiss"),
 	)
 }
 
@@ -278,7 +308,7 @@ func joinVertical(items ...string) string {
 		}
 	}
 	builtItems := make([]string, len(items))
-	style := lipgloss.NewStyle().Width(maxWidth).Background(background)
+	style := lipgloss.NewStyle().Width(maxWidth).Background(xxxDark)
 	for i, it := range items {
 		builtItems[i] = style.Render(it)
 	}

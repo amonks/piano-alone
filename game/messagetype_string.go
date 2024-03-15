@@ -22,16 +22,17 @@ func _() {
 	_ = x[MessageTypeBroadcastPhase-11]
 	_ = x[MessageTypeBroadcastSubmittedTrack-12]
 	_ = x[MessageTypeBroadcastCombinedTrack-13]
-	_ = x[MessageTypeRestart-14]
-	_ = x[MessageTypeAdvancePhase-15]
-	_ = x[MessageTypeKey-16]
-	_ = x[MessageTypeHeroReady-17]
-	_ = x[MessageTypeHeroDone-18]
+	_ = x[MessageTypeBroadcastControllerModal-14]
+	_ = x[MessageTypeRestart-15]
+	_ = x[MessageTypeAdvancePhase-16]
+	_ = x[MessageTypeKey-17]
+	_ = x[MessageTypeHeroReady-18]
+	_ = x[MessageTypeHeroDone-19]
 }
 
-const _MessageType_name = "MessageTypeInvalidMessageTypeExpireLobbyMessageTypeExpireHeroMessageTypeControllerJoinMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeInitialStateMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastSubmittedTrackMessageTypeBroadcastCombinedTrackMessageTypeRestartMessageTypeAdvancePhaseMessageTypeKeyMessageTypeHeroReadyMessageTypeHeroDone"
+const _MessageType_name = "MessageTypeInvalidMessageTypeExpireLobbyMessageTypeExpireHeroMessageTypeControllerJoinMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeInitialStateMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastSubmittedTrackMessageTypeBroadcastCombinedTrackMessageTypeBroadcastControllerModalMessageTypeRestartMessageTypeAdvancePhaseMessageTypeKeyMessageTypeHeroReadyMessageTypeHeroDone"
 
-var _MessageType_index = [...]uint16{0, 18, 40, 61, 86, 101, 117, 146, 169, 204, 242, 263, 288, 322, 355, 373, 396, 410, 430, 449}
+var _MessageType_index = [...]uint16{0, 18, 40, 61, 86, 101, 117, 146, 169, 204, 242, 263, 288, 322, 355, 390, 408, 431, 445, 465, 484}
 
 func (i MessageType) String() string {
 	if i >= MessageType(len(_MessageType_index)-1) {

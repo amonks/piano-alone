@@ -135,6 +135,7 @@ const (
 	MessageTypeBroadcastPhase
 	MessageTypeBroadcastSubmittedTrack
 	MessageTypeBroadcastCombinedTrack
+	MessageTypeBroadcastControllerModal
 
 	MessageTypeRestart
 	MessageTypeAdvancePhase

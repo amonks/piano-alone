@@ -92,6 +92,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 				gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, player.Notes)
 			}
 			gs.setPhase(game.GamePhaseHero)
+			gs.sendTo("controller", game.MessageTypeBroadcastControllerModal, []byte("switch output to video"))
 			return nil
 
 		case game.GamePhaseHero:
