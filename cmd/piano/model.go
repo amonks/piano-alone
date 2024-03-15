@@ -116,6 +116,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case msgGotMIDIOutputPorts:
 		m.midiOutPorts = midi.OutPorts(msg)
+		for i, p := range m.midiOutPorts {
+			if p.String() == "Komplete Audio 6" {
+				m.midiOutPortIndex = i
+				break
+			}
+		}
 		return m, nil
 
 	case msgVersion:
