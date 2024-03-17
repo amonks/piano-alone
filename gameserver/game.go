@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"log"
 
@@ -30,7 +31,7 @@ func NewGame() *GameServer {
 	}
 }
 
-func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) {
+func (gs *GameServer) Start(ctx context.Context, send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) {
 	gs.state.Score = song
 	gs.send = send
 	gs.bus = make(chan *game.Message)
@@ -52,10 +53,16 @@ func (gs *GameServer) Start(send chan<- *game.Message, recv <-chan *game.Message
 		}
 	}()
 
+	done := ctx.Done()
 	for {
-		msg := <-msgs
-		if err := gs.handleMessage(msg); err != nil {
-			log.Printf("msg '%s' produced error: %s", msg.Type, err)
+		select {
+		case <-done:
+			return
+
+		case msg := <-msgs:
+			if err := gs.handleMessage(msg); err != nil {
+				log.Printf("msg '%s' produced error: %s", msg.Type, err)
+			}
 		}
 	}
 }
@@ -188,4 +195,3 @@ func (gs *GameServer) broadcast(msgType game.MessageType, data []byte) {
 func (gs *GameServer) sendTo(fingerprint string, msgType game.MessageType, data []byte) {
 	gs.send <- game.NewMessage(msgType, fingerprint, data)
 }
-

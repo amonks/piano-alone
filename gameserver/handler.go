@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"sync"
@@ -30,7 +31,7 @@ func NewHandler() *Handler {
 	}
 }
 
-func (s *Handler) Start() error {
+func (s *Handler) Start(ctx context.Context) error {
 	gs := NewGame()
 	go func() {
 		for m := range s.outbox {
@@ -56,7 +57,7 @@ func (s *Handler) Start() error {
 		}
 	}()
 	f := songs.ExcerptSMF
-	gs.Start(s.outbox, s.inbox, f)
+	gs.Start(ctx, s.outbox, s.inbox, f)
 	return nil
 }
 

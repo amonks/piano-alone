@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	ctx := sigctx.New()
+	ctx, cancel := sigctx.NewWithCancel()
 	handler := NewHandler()
 	httpErrs := make(chan error)
 	handlerErrs := make(chan error)
@@ -22,25 +22,32 @@ func main() {
 
 	log.Printf("listening on '%s'", addr)
 
-	go func() { handlerErrs <- handler.Start() }()
+	go func() { handlerErrs <- handler.Start(ctx) }()
 	go func() { httpErrs <- s.ListenAndServe() }()
 	select {
 	case <-ctx.Done():
-		// interrupt: stop http, stop game
+		// interrupt: stop game, stop http
 		log.Printf("canceled: %s; shutting down", ctx.Err())
+
+		<-handlerErrs
+		log.Printf("game server stopped")
+
 		s.Shutdown(context.Background())
 		log.Printf("http server stopped")
-		// TODO: stop game
-		log.Printf("game server stopped")
+
 	case err := <-httpErrs:
 		// http error: stop game
 		log.Printf("http server error: %s; shutting down", err)
-		// TODO: stop game
+
+		cancel(context.Canceled)
+		<-handlerErrs
 		log.Printf("game server stopped")
+
 	case err := <-handlerErrs:
 		// game error: stop http
 		log.Printf("game error: %s; shutting down", err)
-		s.Shutdown(context.Background())
+
+		s.Shutdown(ctx)
 		log.Printf("http server stopped")
 	}
 }
