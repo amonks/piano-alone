@@ -65,14 +65,15 @@ func (s *Server) eachConn(f func(string, *websocket.Conn)) {
 }
 
 func New() *Server {
-	return &Server{}
+	return &Server{
+		conns:  map[string]*websocket.Conn{},
+		outbox: make(chan *game.Message),
+		inbox:  make(chan *game.Message),
+	}
 }
 
 func (s *Server) Start() error {
 	gs := gameserver.New()
-	s.conns = map[string]*websocket.Conn{}
-	s.outbox = make(chan *game.Message)
-	s.inbox = make(chan *game.Message)
 	go func() {
 		for m := range s.outbox {
 			if m.Player == "*" {
