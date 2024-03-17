@@ -111,9 +111,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			if _, err := gs.state.Rendition.WriteTo(&buf); err != nil {
 				return err
 			}
-			log.Printf("start bcast")
 			gs.broadcast(game.MessageTypeBroadcastCombinedTrack, buf.Bytes())
-			log.Printf("end bcast")
 			gs.setPhase(game.GamePhasePlayback)
 			return nil
 

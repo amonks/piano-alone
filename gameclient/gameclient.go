@@ -117,6 +117,7 @@ func (c *GameClient) handleMessage(m message) error {
 		case game.MessageTypeBroadcastPhase:
 			msg := game.PhaseFromBytes(m.Data)
 			c.state.Phase = msg
+
 			switch msg.Type {
 			case game.GamePhaseHero:
 				notes := c.state.Players[c.fingerprint].Notes
@@ -128,15 +129,11 @@ func (c *GameClient) handleMessage(m message) error {
 					js.FuncOf(func(_ js.Value, args []js.Value) any {
 						eventType := args[0].String()
 						noteno := uint8(args[1].Int())
-
 						switch eventType {
-
 						case "on":
 							c.loopback <- recorder.Now(midi.NoteOn(1, noteno, 100))
-
 						case "off":
 							c.loopback <- recorder.Now(midi.NoteOff(1, noteno))
-
 						case "ready":
 							c.loopback <- msgHeroReady{}
 						}
@@ -148,18 +145,22 @@ func (c *GameClient) handleMessage(m message) error {
 		case game.MessageTypeBroadcastConnectedPlayer:
 			player := game.PlayerFromBytes(m.Data)
 			c.state.Players[player.Fingerprint] = player
+
 		case game.MessageTypeBroadcastDisconnectedPlayer:
 			c.state.Players[string(m.Data)].ConnectionState = game.ConnectionStateDisconnected
+
 		case game.MessageTypeAssignment:
 			me := c.state.Players[c.fingerprint]
 			me.Notes = m.Data
 			c.myScore = NewScore(abstrack.FromSMF(c.state.Score, 0).Select(me.Notes))
+
 		case game.MessageTypeBroadcastSubmittedTrack:
 			fingerprint := string(m.Data)
 			if _, ok := c.state.Players[fingerprint]; !ok {
 				c.state.Players[fingerprint] = &game.Player{}
 			}
 			c.state.Players[fingerprint].HasSubmitted = true
+
 		case game.MessageTypeBroadcastCombinedTrack:
 			r := bytes.NewReader(m.Data)
 			rendition, err := smf.ReadFrom(r)
@@ -167,6 +168,7 @@ func (c *GameClient) handleMessage(m message) error {
 				return fmt.Errorf("error reading combined smf: %w", err)
 			}
 			c.state.Rendition = rendition
+
 		default:
 			log.Printf("not handling message (type: '%s')", m.Type.String())
 		}
