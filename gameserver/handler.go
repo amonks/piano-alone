@@ -1,4 +1,4 @@
-package server
+package main
 
 import (
 	"log"
@@ -9,12 +9,11 @@ import (
 	"github.com/gorilla/websocket"
 	"monks.co/piano-alone/data"
 	"monks.co/piano-alone/game"
-	"monks.co/piano-alone/gameserver"
 	"monks.co/piano-alone/songs"
 	"monks.co/piano-alone/templates"
 )
 
-type Server struct {
+type Handler struct {
 	controllerConn *websocket.Conn
 	conns          map[string]*websocket.Conn
 	connMu         sync.RWMutex
@@ -23,57 +22,16 @@ type Server struct {
 	outbox chan *game.Message
 }
 
-func (s *Server) addControllerConn(conn *websocket.Conn) {
-	s.connMu.Lock()
-	defer s.connMu.Unlock()
-	s.controllerConn = conn
-}
-func (s *Server) removeControllerConn() {
-	s.connMu.Lock()
-	defer s.connMu.Unlock()
-	s.controllerConn = nil
-}
-
-func (s *Server) addConn(fingerprint string, conn *websocket.Conn) {
-	s.connMu.Lock()
-	defer s.connMu.Unlock()
-	s.conns[fingerprint] = conn
-}
-func (s *Server) removeConn(fingerprint string) {
-	s.connMu.Lock()
-	defer s.connMu.Unlock()
-	delete(s.conns, fingerprint)
-}
-func (s *Server) withConn(fingerprint string, f func(*websocket.Conn)) {
-	s.connMu.RLock()
-	defer s.connMu.RUnlock()
-	if fingerprint == "controller" {
-		f(s.controllerConn)
-	} else {
-		f(s.conns[fingerprint])
-	}
-}
-func (s *Server) eachConn(f func(string, *websocket.Conn)) {
-	s.connMu.RLock()
-	defer s.connMu.RUnlock()
-	if s.controllerConn != nil {
-		f("controller", s.controllerConn)
-	}
-	for fingerprint, sock := range s.conns {
-		f(fingerprint, sock)
-	}
-}
-
-func New() *Server {
-	return &Server{
+func NewHandler() *Handler {
+	return &Handler{
 		conns:  map[string]*websocket.Conn{},
 		outbox: make(chan *game.Message),
 		inbox:  make(chan *game.Message),
 	}
 }
 
-func (s *Server) Start() error {
-	gs := gameserver.New()
+func (s *Handler) Start() error {
+	gs := NewGame()
 	go func() {
 		for m := range s.outbox {
 			if m.Player == "*" {
@@ -102,7 +60,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
-func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func (s *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	mux := http.NewServeMux()
 
 	// pages
@@ -126,6 +84,47 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	mux.ServeHTTP(w, req)
 }
 
+func (s *Handler) addControllerConn(conn *websocket.Conn) {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	s.controllerConn = conn
+}
+func (s *Handler) removeControllerConn() {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	s.controllerConn = nil
+}
+
+func (s *Handler) addConn(fingerprint string, conn *websocket.Conn) {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	s.conns[fingerprint] = conn
+}
+func (s *Handler) removeConn(fingerprint string) {
+	s.connMu.Lock()
+	defer s.connMu.Unlock()
+	delete(s.conns, fingerprint)
+}
+func (s *Handler) withConn(fingerprint string, f func(*websocket.Conn)) {
+	s.connMu.RLock()
+	defer s.connMu.RUnlock()
+	if fingerprint == "controller" {
+		f(s.controllerConn)
+	} else {
+		f(s.conns[fingerprint])
+	}
+}
+func (s *Handler) eachConn(f func(string, *websocket.Conn)) {
+	s.connMu.RLock()
+	defer s.connMu.RUnlock()
+	if s.controllerConn != nil {
+		f("controller", s.controllerConn)
+	}
+	for fingerprint, sock := range s.conns {
+		f(fingerprint, sock)
+	}
+}
+
 func file(filename string) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		log.Printf("<- %s", req.URL.Path)
@@ -142,17 +141,17 @@ func text(t string) http.HandlerFunc {
 
 var upgrader = websocket.Upgrader{}
 
-func (s *Server) HandleRestart(w http.ResponseWriter, req *http.Request) {
+func (s *Handler) HandleRestart(w http.ResponseWriter, req *http.Request) {
 	s.inbox <- game.NewMessage(game.MessageTypeRestart, "", nil)
 	w.Write([]byte("ok"))
 }
 
-func (s *Server) HandleAdvance(w http.ResponseWriter, req *http.Request) {
+func (s *Handler) HandleAdvance(w http.ResponseWriter, req *http.Request) {
 	s.inbox <- game.NewMessage(game.MessageTypeAdvancePhase, "", nil)
 	w.Write([]byte("ok"))
 }
 
-func (s *Server) HandleControllerWebsocket(w http.ResponseWriter, req *http.Request) {
+func (s *Handler) HandleControllerWebsocket(w http.ResponseWriter, req *http.Request) {
 	log.Printf("<- controller")
 	c, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
@@ -174,7 +173,7 @@ func (s *Server) HandleControllerWebsocket(w http.ResponseWriter, req *http.Requ
 	s.removeControllerConn()
 }
 
-func (s *Server) HandlePlayerWebsocket(w http.ResponseWriter, req *http.Request) {
+func (s *Handler) HandlePlayerWebsocket(w http.ResponseWriter, req *http.Request) {
 	log.Printf("<- player")
 	fingerprint := req.URL.Query().Get("fingerprint")
 	if fingerprint == "" {

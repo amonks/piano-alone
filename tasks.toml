@@ -2,19 +2,19 @@
   id = "build"
   type = "short"
   dependencies = ["build-templates", "build-wasm", "generate", "generate-canvas-api-wrapper"]
-  cmd = "go build ./cmd/serve"
+  cmd = "go build ./gameserver"
 
 [[task]]
   id = "start"
   type = "long"
-  cmd = "./serve"
+  cmd = "./gameserver"
 
 [[task]]
   id = "dev"
   type = "long"
   dependencies = ["generate", "build-wasm", "build-templates"]
   watch = ["**/*.go"]
-  cmd = "go run ./cmd/serve"
+  cmd = "go run ./gameserver"
 
 [[task]]
   id = "test"
@@ -35,9 +35,9 @@
     set -xeuo pipefail
 
     CGO_ENABLED=1 GOOS=darwin GOARCH=amd64 \
-      go build -o macos-client-amd64 ./cmd/piano
+      go build -o macos-client-amd64 ./gamecontroller
     CGO_ENABLED=1 GOOS=darwin GOARCH=arm64 \
-      go build -o macos-client-arm64 ./cmd/piano
+      go build -o macos-client-arm64 ./gamecontroller
 
     lipo \
       -output ./macos-client-universal \
@@ -74,7 +74,7 @@
   type = "short"
   watch = ["**/*.go"]
   dependencies = ["generate", "generate-canvas-api-wrapper"]
-  cmd = "GOOS=js GOARCH=wasm go build -o main.wasm ./midihero"
+  cmd = "GOOS=js GOARCH=wasm go build -o main.wasm ./gameplayer"
 
 [[task]]
   id = "build-templates"

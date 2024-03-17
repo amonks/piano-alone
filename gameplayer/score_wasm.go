@@ -1,6 +1,6 @@
 //go:bulid js && wasm
 
-package gameclient
+package main
 
 import (
 	"sort"

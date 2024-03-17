@@ -1,6 +1,6 @@
 //go:build js && wasm
 
-package gameclient
+package main
 
 import (
 	"bytes"

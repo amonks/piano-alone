@@ -5,25 +5,24 @@ import (
 	"log"
 	"net/http"
 
-	"monks.co/piano-alone/server"
 	"monks.co/piano-alone/sigctx"
 )
 
 func main() {
 	ctx := sigctx.New()
-	game := server.New()
+	handler := NewHandler()
 	httpErrs := make(chan error)
-	gameErrs := make(chan error)
+	handlerErrs := make(chan error)
 
 	addr := "0.0.0.0:8080"
 	s := &http.Server{
 		Addr:    addr,
-		Handler: game,
+		Handler: handler,
 	}
 
 	log.Printf("listening on '%s'", addr)
 
-	go func() { gameErrs <- game.Start() }()
+	go func() { handlerErrs <- handler.Start() }()
 	go func() { httpErrs <- s.ListenAndServe() }()
 	select {
 	case <-ctx.Done():
@@ -38,7 +37,7 @@ func main() {
 		log.Printf("http server error: %s; shutting down", err)
 		// TODO: stop game
 		log.Printf("game server stopped")
-	case err := <-gameErrs:
+	case err := <-handlerErrs:
 		// game error: stop http
 		log.Printf("game error: %s; shutting down", err)
 		s.Shutdown(context.Background())

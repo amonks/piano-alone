@@ -11,7 +11,6 @@ import (
 
 	"monks.co/piano-alone/baseurl"
 	"monks.co/piano-alone/game"
-	"monks.co/piano-alone/gameclient"
 	"monks.co/piano-alone/jsws"
 	"monks.co/piano-alone/storage"
 )
@@ -55,7 +54,7 @@ func main() {
 	}()
 
 	root := js.Global().Get("document").Call("getElementById", "root")
-	gc := gameclient.New(fingerprint, root)
+	gc := New(fingerprint, root)
 	if err := gc.Start(outbox, inbox); err != nil {
 		panic(err)
 	}

@@ -1,4 +1,4 @@
-package server
+package main
 
 import "monks.co/piano-alone/pianists"
 
@@ -13,4 +13,3 @@ func NewPlayerSession(fingerprint string) *PlayerSession {
 		Name:        pianists.Hash(fingerprint),
 	}
 }
-

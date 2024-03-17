@@ -1,4 +1,4 @@
-package gameserver
+package main
 
 import (
 	"bytes"
@@ -23,7 +23,7 @@ type GameServer struct {
 	partials map[string]*smf.SMF
 }
 
-func New() *GameServer {
+func NewGame() *GameServer {
 	return &GameServer{
 		state:    game.NewState(),
 		partials: map[string]*smf.SMF{},
@@ -188,3 +188,4 @@ func (gs *GameServer) broadcast(msgType game.MessageType, data []byte) {
 func (gs *GameServer) sendTo(fingerprint string, msgType game.MessageType, data []byte) {
 	gs.send <- game.NewMessage(msgType, fingerprint, data)
 }
+
