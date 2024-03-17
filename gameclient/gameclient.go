@@ -31,7 +31,6 @@ type GameClient struct {
 	pianoHandle    js.Value
 	canvasNode     js.Value
 	startPlayingAt time.Time
-	notes          chan recorder.Event
 	recorder       *recorder.Recorder
 }
 
@@ -39,8 +38,7 @@ func New(fingerprint string, root js.Value) *GameClient {
 	return &GameClient{
 		state:       game.NewState(),
 		fingerprint: fingerprint,
-		notes:       make(chan recorder.Event),
-		recorder:    recorder.New(),
+		recorder:    recorder.New(120),
 	}
 }
 
@@ -96,12 +94,23 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 			}
 			c.pianoHandle.Call("transition", list,
 				js.FuncOf(func(_ js.Value, args []js.Value) any {
-					switch args[0].String() {
-					case "on", "off":
-						c.loopback <- game.NewKeyMsg(
-							uint8(args[1].Int()),
-							args[0].String() == "on",
-						)
+					eventType := args[0].String()
+					noteno := uint8(args[1].Int())
+
+					switch eventType {
+
+					case "on":
+						c.loopback <- game.NewMessage(
+							game.MessageTypeKey,
+							"",
+							recorder.Now(midi.NoteOn(1, noteno, 100)).Bytes())
+
+					case "off":
+						c.loopback <- game.NewMessage(
+							game.MessageTypeKey,
+							"",
+							recorder.Now(midi.NoteOff(1, noteno)).Bytes())
+
 					case "ready":
 						c.loopback <- game.NewMessage(game.MessageTypeHeroReady, "", nil)
 					}
@@ -111,34 +120,20 @@ func (c *GameClient) handleMessage(m *game.Message) error {
 		}
 	case game.MessageTypeHeroReady:
 		c.startPlayingAt = time.Now()
-		go c.recorder.Record(120, c.notes)
+		c.animate()
 		go func() {
 			time.Sleep(c.myScore.NoteTracks[0].Track.Dur() + screenDuration)
 			c.loopback <- game.NewMessage(game.MessageTypeHeroDone, "", nil)
 		}()
-		c.animate()
 	case game.MessageTypeHeroDone:
-		close(c.notes)
+		c.recorder.Close()
 		bs, err := c.recorder.Bytes()
 		if err != nil {
 			panic(err)
 		}
 		c.send <- game.NewMessage(game.MessageTypeSubmitPartialTrack, "", bs)
 	case game.MessageTypeKey:
-		key := game.KeyFromBytes(m.Data)
-		log.Printf("event: %v, %v", key.Noteno, key.IsNoteOn)
-		go func() {
-			var note recorder.Event
-			switch key.IsNoteOn {
-			case true:
-				note = recorder.Now(midi.NoteOn(1, key.Noteno, 100))
-			case false:
-				note = recorder.Now(midi.NoteOff(1, key.Noteno))
-			}
-			select {
-			case c.notes <- note:
-			}
-		}()
+		c.recorder.Record(recorder.EventFromBytes(m.Data))
 	case game.MessageTypeBroadcastConnectedPlayer:
 		player := game.PlayerFromBytes(m.Data)
 		c.state.Players[player.Fingerprint] = player

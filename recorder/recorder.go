@@ -2,6 +2,7 @@ package recorder
 
 import (
 	"bytes"
+	"encoding/gob"
 	"fmt"
 	"sync"
 	"time"
@@ -12,19 +13,47 @@ import (
 
 // Recorder records notes into a MIDI SMF file.
 type Recorder struct {
-	file *smf.SMF
-	mu   sync.Mutex
+	bpm      float64
+	lastNano int64
+	ticks    smf.MetricTicks
+	track    smf.Track
+	file     *smf.SMF
+	mu       sync.Mutex
 }
 
-func New() *Recorder {
-	return &Recorder{
-		file: smf.New(),
+func New(bpm float64) *Recorder {
+	file := smf.New()
+	r := &Recorder{
+		file:  file,
+		bpm:   bpm,
+		ticks: file.TimeFormat.(smf.MetricTicks),
 	}
+	r.track.Add(0, smf.MetaTempo(bpm))
+	return r
 }
 
 type Event struct {
 	Timestamp time.Time
 	Message   midi.Message
+}
+
+func (m Event) Bytes() []byte {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	if err := enc.Encode(m); err != nil {
+		panic(err)
+	}
+	return buf.Bytes()
+}
+
+func EventFromBytes(bs []byte) Event {
+	buf := bytes.NewReader(bs)
+	dec := gob.NewDecoder(buf)
+	var m Event
+	if err := dec.Decode(&m); err != nil {
+		panic(err)
+	}
+	return m
 }
 
 func At(msg midi.Message, when time.Time) Event {
@@ -35,37 +64,37 @@ func Now(msg midi.Message) Event {
 	return Event{time.Now(), msg}
 }
 
-// Record, given a channel full of midi messages, writes them into the SMF
-// until the channel is closed.
-func (r *Recorder) Record(bpm float64, c <-chan Event) {
+func (r *Recorder) Record(msg Event) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	ticks := r.file.TimeFormat.(smf.MetricTicks)
-
-	var tr smf.Track
-	tr.Add(0, smf.MetaTempo(bpm))
-
-	var lastNano int64
-	for msg := range c {
-		thisNano := msg.Timestamp.UnixNano()
-		if lastNano == 0 {
-			lastNano = thisNano
-		}
-		deltaNano := thisNano - lastNano
-		deltaTicks := ticks.Ticks(bpm, time.Duration(deltaNano))
-		lastNano = thisNano
-		tr.Add(deltaTicks, msg.Message)
+	if r.track.IsClosed() {
+		return
 	}
-	tr.Close(960)
-	r.file.Add(tr)
+
+	thisNano := msg.Timestamp.UnixNano()
+	if r.lastNano == 0 {
+		r.lastNano = thisNano
+	}
+	deltaNano := thisNano - r.lastNano
+	deltaTicks := r.ticks.Ticks(r.bpm, time.Duration(deltaNano))
+	r.lastNano = thisNano
+	r.track.Add(deltaTicks, msg.Message)
+}
+
+func (r *Recorder) Close() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.track.Close(960)
+	r.file.Add(r.track)
 }
 
 func (r *Recorder) SMF() (*smf.SMF, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if len(r.file.Tracks) == 0 || !r.file.Tracks[0].IsClosed() {
+	if !r.track.IsClosed() {
 		return nil, fmt.Errorf("recorder is not closed")
 	}
 	return r.file, nil
@@ -75,7 +104,7 @@ func (r *Recorder) Bytes() ([]byte, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if !r.file.Tracks[0].IsClosed() {
+	if !r.track.IsClosed() {
 		return nil, fmt.Errorf("recorder is not closed")
 	}
 	var buf bytes.Buffer
