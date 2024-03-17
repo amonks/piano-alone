@@ -29,7 +29,22 @@ func ComingSoon() templ.Component {
 				templ_7745c5c3_Buffer = templ.GetBuffer()
 				defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 			}
-			templ_7745c5c3_Err = markdown("copy.md").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Var3 := templ.ComponentFunc(func(ctx context.Context, templ_7745c5c3_W io.Writer) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templ_7745c5c3_W.(*bytes.Buffer)
+				if !templ_7745c5c3_IsBuffer {
+					templ_7745c5c3_Buffer = templ.GetBuffer()
+					defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
+				}
+				templ_7745c5c3_Err = markdown("copy.md").Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if !templ_7745c5c3_IsBuffer {
+					_, templ_7745c5c3_Err = io.Copy(templ_7745c5c3_W, templ_7745c5c3_Buffer)
+				}
+				return templ_7745c5c3_Err
+			})
+			templ_7745c5c3_Err = container().Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -38,7 +53,7 @@ func ComingSoon() templ.Component {
 			}
 			return templ_7745c5c3_Err
 		})
-		templ_7745c5c3_Err = container("coming soon").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = page("coming soon").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -57,18 +72,33 @@ func Download() templ.Component {
 			defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var3 == nil {
-			templ_7745c5c3_Var3 = templ.NopComponent
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var4 := templ.ComponentFunc(func(ctx context.Context, templ_7745c5c3_W io.Writer) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var5 := templ.ComponentFunc(func(ctx context.Context, templ_7745c5c3_W io.Writer) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templ_7745c5c3_W.(*bytes.Buffer)
 			if !templ_7745c5c3_IsBuffer {
 				templ_7745c5c3_Buffer = templ.GetBuffer()
 				defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 			}
-			templ_7745c5c3_Err = markdown("download.md").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Var6 := templ.ComponentFunc(func(ctx context.Context, templ_7745c5c3_W io.Writer) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templ_7745c5c3_W.(*bytes.Buffer)
+				if !templ_7745c5c3_IsBuffer {
+					templ_7745c5c3_Buffer = templ.GetBuffer()
+					defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
+				}
+				templ_7745c5c3_Err = markdown("download.md").Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if !templ_7745c5c3_IsBuffer {
+					_, templ_7745c5c3_Err = io.Copy(templ_7745c5c3_W, templ_7745c5c3_Buffer)
+				}
+				return templ_7745c5c3_Err
+			})
+			templ_7745c5c3_Err = container().Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -77,7 +107,7 @@ func Download() templ.Component {
 			}
 			return templ_7745c5c3_Err
 		})
-		templ_7745c5c3_Err = container("download").Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = page("download").Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -96,9 +126,9 @@ func header() templ.Component {
 			defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var5 == nil {
-			templ_7745c5c3_Var5 = templ.NopComponent
+		templ_7745c5c3_Var7 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var7 == nil {
+			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<header class=\"pb-6 pt-2 md:pt-12 border-b bg-black text-white\"><div class=\"display max-w-2xl px-2 md:pb-4 mx-auto\"><h1 class=\"md:text-7xl text-4xl uppercase\">Life Online</h1><h2 class=\"md:text-5xl text-2xl mb-6\">Piano Telephone</h2></div><div class=\"mono max-w-2xl px-2 mx-auto\"><div class=\"text-xl\"><span class=\"em\">by</span> <a href=\"https://monks.co\">Andrew Monks</a></div><div class=\"text-xl\"><span class=\"em\">streaming on</span> March 23, 2024</div></div></header>")
@@ -112,7 +142,7 @@ func header() templ.Component {
 	})
 }
 
-func container(title string) templ.Component {
+func container() templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, templ_7745c5c3_W io.Writer) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templ_7745c5c3_W.(*bytes.Buffer)
 		if !templ_7745c5c3_IsBuffer {
@@ -120,28 +150,11 @@ func container(title string) templ.Component {
 			defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var6 == nil {
-			templ_7745c5c3_Var6 = templ.NopComponent
+		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var8 == nil {
+			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var7 string
-		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(title)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 33, Col: 17}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" • piano.computer</title><link rel=\"stylesheet\" href=\"https://use.typekit.net/ipj8hpy.css\"><link rel=\"stylesheet\" href=\"/style.css\"><script src=\"https://cdn.tailwindcss.com\"></script></head><body>")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
 		templ_7745c5c3_Err = header().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
@@ -150,11 +163,64 @@ func container(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templ_7745c5c3_Var6.Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = templ_7745c5c3_Var8.Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div></body></html>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if !templ_7745c5c3_IsBuffer {
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteTo(templ_7745c5c3_W)
+		}
+		return templ_7745c5c3_Err
+	})
+}
+
+func page(title string) templ.Component {
+	return templ.ComponentFunc(func(ctx context.Context, templ_7745c5c3_W io.Writer) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templ_7745c5c3_W.(*bytes.Buffer)
+		if !templ_7745c5c3_IsBuffer {
+			templ_7745c5c3_Buffer = templ.GetBuffer()
+			defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var9 == nil {
+			templ_7745c5c3_Var9 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width\"><title>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var10 string
+		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(title)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 44, Col: 17}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" • piano.computer</title>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = style("style.css").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<link rel=\"stylesheet\" href=\"https://use.typekit.net/ipj8hpy.css\"><script src=\"https://cdn.tailwindcss.com\"></script></head><body>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templ_7745c5c3_Var9.Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("</body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -173,12 +239,47 @@ func App() templ.Component {
 			defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var8 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var8 == nil {
-			templ_7745c5c3_Var8 = templ.NopComponent
+		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var11 == nil {
+			templ_7745c5c3_Var11 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<!doctype html><html><head><meta charset=\"utf-8\"><title>piano.computer</title><script src=\"wasm_exec.js\"></script><link rel=\"stylesheet\" href=\"/style.css\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no\"><script src=\"https://cdn.tailwindcss.com\"></script></head><body><canvas></canvas><div id=\"piano\"></div><script>\n\t\t\t\tconst go = new Go();\n\t\t\t\tWebAssembly.instantiateStreaming(fetch(\"main.wasm\"), go.importObject)\n\t\t\t\t\t.then((result) => {\n\t\t\t\t\t\tgo.run(result.instance);\n\t\t\t\t\t})\n\t\t\t\t\t.catch((error) => {\n\t\t\t\t\t\tconsole.error(error);\n\t\t\t\t\t});\n\n\t\t\t\t\twindow.Piano = function(container) {\n\t\t\t\t\t\tconst order = [\n\t\t\t\t\t\t\t[\"white\", \"A\"], // a\n\t\t\t\t\t\t\t[\"black\", \"As\"],\n\t\t\t\t\t\t\t[\"white\", \"B\"], // b\n\t\t\t\t\t\t\t[\"white\", \"C\"], // c\n\t\t\t\t\t\t\t[\"black\", \"Cs\"],\n\t\t\t\t\t\t\t[\"white\", \"D\"], // d\n\t\t\t\t\t\t\t[\"black\", \"Ds\"],\n\t\t\t\t\t\t\t[\"white\", \"E\"], // e\n\t\t\t\t\t\t\t[\"white\", \"F\"], // f\n\t\t\t\t\t\t\t[\"black\", \"Fs\"],\n\t\t\t\t\t\t\t[\"white\", \"G\"], // g\n\t\t\t\t\t\t\t[\"black\", \"Gs\"],\n\t\t\t\t\t\t];\n\n\t\t\t\t\t\tfunction sleep(ms) {\n\t\t\t\t\t\t\treturn new Promise(res => {\n\t\t\t\t\t\t\t\tsetTimeout(() => res(), ms)\n\t\t\t\t\t\t\t})\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\t// build piano\n\t\t\t\t\t\tfor (let i = 0; i < 88; i++) {\n\t\t\t\t\t\t\tconst noteno = i+21\n\t\t\t\t\t\t\tconst [color, notename] = order[i % order.length]\n\n\t\t\t\t\t\t\tconst el = document.createElement(\"div\");\n\t\t\t\t\t\t\tel.dataset.noteno = noteno;\n\t\t\t\t\t\t\tel.dataset.notename = notename;\n\t\t\t\t\t\t\tel.dataset.color = color;\n\n\t\t\t\t\t\t\tel.classList.add(\"key\");\n\t\t\t\t\t\t\tel.classList.add(color);\n\t\t\t\t\t\t\tel.classList.add(notename);\n\n\t\t\t\t\t\t\tcontainer.appendChild(el);\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\tasync function transition(notes, handleTouch) {\n\t\t\t\t\t\t\tconst keep = new Set(notes.split(\",\").sort((a, b) => a-b));\n\n\t\t\t\t\t\t\t// de-emphasize non-button keys\n\t\t\t\t\t\t\tfor (const key of Array.from(container.children)) {\n\t\t\t\t\t\t\t\tif (!keep.has(key.dataset.noteno)) {\n\t\t\t\t\t\t\t\t\tkey.style.setProperty(\"opacity\", \"0\")\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tawait sleep(1000)\n\n\t\t\t\t\t\t\t// add buttons\n\t\t\t\t\t\t\tconst buttons = {}\n\t\t\t\t\t\t\tlet i = 0\n\t\t\t\t\t\t\tfor (const key of Array.from(container.children)) {\n\t\t\t\t\t\t\t\tif (!keep.has(key.dataset.noteno)) {\n\t\t\t\t\t\t\t\t\tcontinue\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\tconst el = document.createElement(\"div\")\n\t\t\t\t\t\t\t\tconst rect = key.getBoundingClientRect()\n\t\t\t\t\t\t\t\tel.classList.add(\"button\")\n\t\t\t\t\t\t\t\tel.dataset.noteno = key.dataset.noteno\n\t\t\t\t\t\t\t\tel.dataset.notename = key.dataset.notename\n\t\t\t\t\t\t\t\tel.style.setProperty(\"left\", `${rect.x}px`);\n\t\t\t\t\t\t\t\tel.style.setProperty(\"width\", `${rect.width}px`);\n\t\t\t\t\t\t\t\tel.style.setProperty(\"height\", `${rect.height}px`);\n\t\t\t\t\t\t\t\tel.style.setProperty(\"background-color\", key.dataset.color);\n\t\t\t\t\t\t\t\tel.style.setProperty(\"transition-duration\", \"1s\");\n\t\t\t\t\t\t\t\tcontainer.appendChild(el)\n\t\t\t\t\t\t\t\tbuttons[key.dataset.noteno] = el\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t// remove keys\n\t\t\t\t\t\t\tfor (const key of Array.from(container.children)) {\n\t\t\t\t\t\t\t\tif (key.classList.contains(\"key\")) {\n\t\t\t\t\t\t\t\t\tcontainer.removeChild(key)\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tawait sleep(0)\n\n\t\t\t\t\t\t\t// move buttons\n\t\t\t\t\t\t\tlet j = 0\n\t\t\t\t\t\t\tfor (const noteno of keep) {\n\t\t\t\t\t\t\t\tconst el = buttons[noteno]\n\t\t\t\t\t\t\t\tel.style.setProperty(\"left\", `calc(${j} * 100% / ${keep.size})`);\n\t\t\t\t\t\t\t\tel.style.setProperty(\"height\", 'var(--key-height)');\n\t\t\t\t\t\t\t\tel.style.setProperty(\"width\", `calc(100% / ${keep.size})`);\n\t\t\t\t\t\t\t\tj++\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\tawait sleep(1000)\n\n\t\t\t\t\t\t\t// add event listeners\n\t\t\t\t\t\t\tfunction makeEventListener(el, name, noteno) {\n\t\t\t\t\t\t\t\treturn function(ev) {\n\t\t\t\t\t\t\t\t\tev.preventDefault()\n\t\t\t\t\t\t\t\t\tif (name === \"on\") {\n\t\t\t\t\t\t\t\t\t\tel.style.setProperty(\"background-color\", \"#dddddd\")\n\t\t\t\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t\t\t\tel.style.setProperty(\"background-color\", \"white\")\n\t\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t\t\thandleTouch(name, noteno);\n\t\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t\tfor (const el of Object.values(buttons)) {\n\t\t\t\t\t\t\t\tconst noteno = Number(el.dataset.noteno)\n\t\t\t\t\t\t\t\tconst on = makeEventListener(el, \"on\", noteno)\n\t\t\t\t\t\t\t\tconst off = makeEventListener(el, \"off\", noteno)\n\t\t\t\t\t\t\t\tel.addEventListener(\"touchstart\", on)\n\t\t\t\t\t\t\t\tel.addEventListener(\"mousedown\", on)\n\t\t\t\t\t\t\t\tel.addEventListener(\"touchend\", off)\n\t\t\t\t\t\t\t\tel.addEventListener(\"mouseup\", off)\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\t// de-emphasize buttons\n\t\t\t\t\t\t\tfor (const el of Object.values(buttons)) {\n\t\t\t\t\t\t\t\tel.style.setProperty(\"background-color\", \"white\")\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\tawait sleep(1000)\n\t\t\t\t\t\t\tfor (const el of Object.values(buttons)) {\n\t\t\t\t\t\t\t\tel.style.setProperty(\"transition-property\", \"none\");\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\thandleTouch(\"ready\", 0)\n\t\t\t\t\t\t}\n\n\t\t\t\t\t\treturn {transition}\n\t\t\t\t\t}\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Var12 := templ.ComponentFunc(func(ctx context.Context, templ_7745c5c3_W io.Writer) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templ_7745c5c3_W.(*bytes.Buffer)
+			if !templ_7745c5c3_IsBuffer {
+				templ_7745c5c3_Buffer = templ.GetBuffer()
+				defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<canvas></canvas><div id=\"piano\"></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = script("wasm_exec.js").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = script("wasm.js").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = script("piano.js").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if !templ_7745c5c3_IsBuffer {
+				_, templ_7745c5c3_Err = io.Copy(templ_7745c5c3_W, templ_7745c5c3_Buffer)
+			}
+			return templ_7745c5c3_Err
+		})
+		templ_7745c5c3_Err = page("life online").Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

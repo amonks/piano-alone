@@ -1,14 +1,18 @@
 package templates
 
 templ ComingSoon() {
-	@container("coming soon") {
-		@markdown("copy.md")
+	@page("coming soon") {
+		@container() {
+			@markdown("copy.md")
+		}
 	}
 }
 
 templ Download() {
-	@container("download") {
-		@markdown("download.md")
+	@page("download") {
+		@container() {
+			@markdown("download.md")
+		}
 	}
 }
 
@@ -25,178 +29,36 @@ templ header() {
 	</header>
 }
 
-templ container(title string) {
+templ container() {
+	@header()
+	<div class="copy py-6 px-2 max-w-2xl mx-auto text-xl">
+		{ children... }
+	</div>
+}
+
+templ page(title string) {
 	<!DOCTYPE html>
 	<html>
 		<head>
 			<meta charset="utf-8"/>
 			<meta name="viewport" content="width=device-width"/>
 			<title>{ title } • piano.computer</title>
+			@style("style.css")
 			<link rel="stylesheet" href="https://use.typekit.net/ipj8hpy.css"/>
-			<link rel="stylesheet" href="/style.css"/>
 			<script src="https://cdn.tailwindcss.com"></script>
 		</head>
 		<body>
-			@header()
-			<div class="copy py-6 px-2 max-w-2xl mx-auto text-xl">
-				{ children... }
-			</div>
+			{ children... }
 		</body>
 	</html>
 }
 
 templ App() {
-	<!DOCTYPE html>
-	<html>
-		<head>
-			<meta charset="utf-8"/>
-			<title>piano.computer</title>
-			<script src="wasm_exec.js"></script>
-			<link rel="stylesheet" href="/style.css"/>
-			<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-			<script src="https://cdn.tailwindcss.com"></script>
-		</head>
-		<body>
-			<canvas></canvas>
-			<div id="piano"></div>
-			<script>
-				const go = new Go();
-				WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)
-					.then((result) => {
-						go.run(result.instance);
-					})
-					.catch((error) => {
-						console.error(error);
-					});
-
-					window.Piano = function(container) {
-						const order = [
-							["white", "A"], // a
-							["black", "As"],
-							["white", "B"], // b
-							["white", "C"], // c
-							["black", "Cs"],
-							["white", "D"], // d
-							["black", "Ds"],
-							["white", "E"], // e
-							["white", "F"], // f
-							["black", "Fs"],
-							["white", "G"], // g
-							["black", "Gs"],
-						];
-
-						function sleep(ms) {
-							return new Promise(res => {
-								setTimeout(() => res(), ms)
-							})
-						}
-
-						// build piano
-						for (let i = 0; i < 88; i++) {
-							const noteno = i+21
-							const [color, notename] = order[i % order.length]
-
-							const el = document.createElement("div");
-							el.dataset.noteno = noteno;
-							el.dataset.notename = notename;
-							el.dataset.color = color;
-
-							el.classList.add("key");
-							el.classList.add(color);
-							el.classList.add(notename);
-
-							container.appendChild(el);
-						}
-
-						async function transition(notes, handleTouch) {
-							const keep = new Set(notes.split(",").sort((a, b) => a-b));
-
-							// de-emphasize non-button keys
-							for (const key of Array.from(container.children)) {
-								if (!keep.has(key.dataset.noteno)) {
-									key.style.setProperty("opacity", "0")
-								}
-							}
-							await sleep(1000)
-
-							// add buttons
-							const buttons = {}
-							let i = 0
-							for (const key of Array.from(container.children)) {
-								if (!keep.has(key.dataset.noteno)) {
-									continue
-								}
-								const el = document.createElement("div")
-								const rect = key.getBoundingClientRect()
-								el.classList.add("button")
-								el.dataset.noteno = key.dataset.noteno
-								el.dataset.notename = key.dataset.notename
-								el.style.setProperty("left", `${rect.x}px`);
-								el.style.setProperty("width", `${rect.width}px`);
-								el.style.setProperty("height", `${rect.height}px`);
-								el.style.setProperty("background-color", key.dataset.color);
-								el.style.setProperty("transition-duration", "1s");
-								container.appendChild(el)
-								buttons[key.dataset.noteno] = el
-							}
-							// remove keys
-							for (const key of Array.from(container.children)) {
-								if (key.classList.contains("key")) {
-									container.removeChild(key)
-								}
-							}
-							await sleep(0)
-
-							// move buttons
-							let j = 0
-							for (const noteno of keep) {
-								const el = buttons[noteno]
-								el.style.setProperty("left", `calc(${j} * 100% / ${keep.size})`);
-								el.style.setProperty("height", 'var(--key-height)');
-								el.style.setProperty("width", `calc(100% / ${keep.size})`);
-								j++
-							}
-
-							await sleep(1000)
-
-							// add event listeners
-							function makeEventListener(el, name, noteno) {
-								return function(ev) {
-									ev.preventDefault()
-									if (name === "on") {
-										el.style.setProperty("background-color", "#dddddd")
-									} else {
-										el.style.setProperty("background-color", "white")
-									}
-									handleTouch(name, noteno);
-								}
-							}
-							for (const el of Object.values(buttons)) {
-								const noteno = Number(el.dataset.noteno)
-								const on = makeEventListener(el, "on", noteno)
-								const off = makeEventListener(el, "off", noteno)
-								el.addEventListener("touchstart", on)
-								el.addEventListener("mousedown", on)
-								el.addEventListener("touchend", off)
-								el.addEventListener("mouseup", off)
-							}
-
-							// de-emphasize buttons
-							for (const el of Object.values(buttons)) {
-								el.style.setProperty("background-color", "white")
-							}
-
-							await sleep(1000)
-							for (const el of Object.values(buttons)) {
-								el.style.setProperty("transition-property", "none");
-							}
-
-							handleTouch("ready", 0)
-						}
-
-						return {transition}
-					}
-			</script>
-		</body>
-	</html>
+	@page("life online") {
+		<canvas></canvas>
+		<div id="piano"></div>
+		@script("wasm_exec.js")
+		@script("wasm.js")
+		@script("piano.js")
+	}
 }

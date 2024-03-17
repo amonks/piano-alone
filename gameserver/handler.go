@@ -65,13 +65,11 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	mux := http.NewServeMux()
 
 	// pages
-	mux.Handle("GET /", templ.Handler(templates.ComingSoon()))
-	mux.Handle("GET /app", templ.Handler(templates.App()))
-	mux.Handle("GET /download", templ.Handler(templates.Download()))
+	mux.Handle("GET /", gzipMiddleware(templ.Handler(templates.ComingSoon())))
+	mux.Handle("GET /app", gzipMiddleware(templ.Handler(templates.App())))
+	mux.Handle("GET /download", gzipMiddleware(templ.Handler(templates.Download())))
 
 	// files
-	mux.HandleFunc("GET /wasm_exec.js", file("wasm_exec.js"))
-	mux.HandleFunc("GET /style.css", file("style.css"))
 	mux.HandleFunc("GET /main.wasm", file("main.wasm"))
 
 	// API
