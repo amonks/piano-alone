@@ -139,10 +139,6 @@ const (
 
 	MessageTypeRestart
 	MessageTypeAdvancePhase
-
-	MessageTypeKey
-	MessageTypeHeroReady
-	MessageTypeHeroDone
 )
 
 func (m *Message) String() string {

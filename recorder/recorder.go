@@ -2,7 +2,6 @@ package recorder
 
 import (
 	"bytes"
-	"encoding/gob"
 	"fmt"
 	"sync"
 	"time"
@@ -35,25 +34,6 @@ func New(bpm float64) *Recorder {
 type Event struct {
 	Timestamp time.Time
 	Message   midi.Message
-}
-
-func (m Event) Bytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(m); err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
-
-func EventFromBytes(bs []byte) Event {
-	buf := bytes.NewReader(bs)
-	dec := gob.NewDecoder(buf)
-	var m Event
-	if err := dec.Decode(&m); err != nil {
-		panic(err)
-	}
-	return m
 }
 
 func At(msg midi.Message, when time.Time) Event {

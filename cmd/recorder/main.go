@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
 	"gitlab.com/gomidi/midi/v2"
 	"monks.co/piano-alone/recorder"
@@ -26,17 +25,12 @@ var (
 func run() error {
 	flag.Parse()
 
-	c := make(chan recorder.Event)
-
-	r := recorder.New()
-	go r.Record(120, c)
-
+	r := recorder.New(120)
 	s := bufio.NewScanner(os.Stdin)
 	for s.Scan() {
-		c <- recorder.Now(midi.NoteOn(1, uint8(*note), 100))
+		r.Record(recorder.Now(midi.NoteOn(1, uint8(*note), 100)))
 	}
-	close(c)
-	time.Sleep(time.Second)
+	r.Close()
 
 	bs, err := r.Bytes()
 	if err != nil {
