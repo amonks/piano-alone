@@ -100,7 +100,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.modal = string(msg.Data)
 
 		case game.MessageTypeBroadcastSubmittedTrack:
-			m.modal = string(msg.Data)
+			fingerprint := string(msg.Data)
+			if _, ok := m.state.Players[fingerprint]; !ok {
+				m.state.Players[fingerprint] = &game.Player{}
+			}
+			m.state.Players[fingerprint].HasSubmitted = true
 
 		case game.MessageTypeBroadcastCombinedTrack:
 			m.midi = msg.Data
