@@ -13,6 +13,9 @@ type State struct {
 	Phase     Phase
 	Players   map[string]*Player
 	Rendition *smf.SMF
+
+	DisklavierIsConnected bool
+	ConductorIsConnected  bool
 }
 
 func init() {
@@ -122,7 +125,10 @@ const (
 	MessageTypeExpireLobby
 	MessageTypeExpireHero
 
-	MessageTypeControllerJoin
+	MessageTypeDisklavierConnected
+	MessageTypeDisklavierDisconnected
+	MessageTypeConductorConnected
+	MessageTypeConductorDisconnected
 
 	MessageTypeJoin
 	MessageTypeLeave

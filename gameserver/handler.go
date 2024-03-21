@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -15,7 +16,8 @@ import (
 )
 
 type Handler struct {
-	controllerConn *websocket.Conn
+	disklavierConn *websocket.Conn
+	conductorConn  *websocket.Conn
 	conns          map[string]*websocket.Conn
 	connMu         sync.RWMutex
 
@@ -45,10 +47,11 @@ func (s *Handler) Start(ctx context.Context) error {
 				continue
 			}
 
-			log.Printf("send: '%s'", m.Type)
+			log.Printf("send: '%s' to '%s'", m.Type, m.Player)
 			s.withConn(m.Player, func(conn *websocket.Conn) {
 				if conn == nil {
-					panic("no such player " + m.Player)
+					log.Printf("no such player %s", m.Player)
+					return
 				}
 				if err := conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
 					panic(err)
@@ -83,41 +86,53 @@ func (s *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	mux.ServeHTTP(w, req)
 }
 
-func (s *Handler) addControllerConn(conn *websocket.Conn) {
-	s.connMu.Lock()
-	defer s.connMu.Unlock()
-	s.controllerConn = conn
-}
-func (s *Handler) removeControllerConn() {
-	s.connMu.Lock()
-	defer s.connMu.Unlock()
-	s.controllerConn = nil
-}
-
 func (s *Handler) addConn(fingerprint string, conn *websocket.Conn) {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
-	s.conns[fingerprint] = conn
+	switch fingerprint {
+	case "disklavier":
+		s.disklavierConn = conn
+	case "conductor":
+		s.conductorConn = conn
+	default:
+		s.conns[fingerprint] = conn
+	}
 }
 func (s *Handler) removeConn(fingerprint string) {
 	s.connMu.Lock()
 	defer s.connMu.Unlock()
-	delete(s.conns, fingerprint)
+	switch fingerprint {
+	case "disklavier":
+		s.disklavierConn = nil
+		go func() { s.inbox <- game.NewMessage(game.MessageTypeDisklavierDisconnected, "", nil) }()
+	case "conductor":
+		s.conductorConn = nil
+		go func() { s.inbox <- game.NewMessage(game.MessageTypeConductorDisconnected, "", nil) }()
+	default:
+		delete(s.conns, fingerprint)
+	}
 }
 func (s *Handler) withConn(fingerprint string, f func(*websocket.Conn)) {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
-	if fingerprint == "controller" {
-		f(s.controllerConn)
-	} else {
+	switch fingerprint {
+	case "disklavier":
+		f(s.disklavierConn)
+	case "conductor":
+		f(s.conductorConn)
+	default:
+		fmt.Println("f:", fingerprint)
 		f(s.conns[fingerprint])
 	}
 }
 func (s *Handler) eachConn(f func(string, *websocket.Conn)) {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
-	if s.controllerConn != nil {
-		f("controller", s.controllerConn)
+	if s.disklavierConn != nil {
+		f("disklavier", s.disklavierConn)
+	}
+	if s.conductorConn != nil {
+		f("conductor", s.conductorConn)
 	}
 	for fingerprint, sock := range s.conns {
 		f(fingerprint, sock)
@@ -152,12 +167,16 @@ func (s *Handler) HandleAdvance(w http.ResponseWriter, req *http.Request) {
 
 func (s *Handler) HandleControllerWebsocket(w http.ResponseWriter, req *http.Request) {
 	log.Printf("<- controller")
+	role := req.URL.Query().Get("role")
+	if role != "conductor" {
+		role = "disklavier"
+	}
 	c, err := upgrader.Upgrade(w, req, nil)
 	if err != nil {
 		log.Printf("ws upgrade error: %s\n", err.Error())
 		return
 	}
-	s.addControllerConn(c)
+	s.addConn(role, c)
 
 	for {
 		_, bs, err := c.ReadMessage()
@@ -169,7 +188,7 @@ func (s *Handler) HandleControllerWebsocket(w http.ResponseWriter, req *http.Req
 		m := game.MessageFromBytes(bs)
 		s.inbox <- m
 	}
-	s.removeControllerConn()
+	s.removeConn(role)
 }
 
 func (s *Handler) HandlePlayerWebsocket(w http.ResponseWriter, req *http.Request) {

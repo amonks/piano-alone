@@ -102,7 +102,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 				gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, player.Notes)
 			}
 			gs.setPhase(game.GamePhaseHero)
-			gs.sendTo("controller", game.MessageTypeBroadcastControllerModal, []byte("switch output to video"))
+			gs.sendTo("disklavier", game.MessageTypeBroadcastControllerModal, []byte("switch output to video"))
 			return nil
 
 		case game.GamePhaseHero:
@@ -130,8 +130,26 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		}
 		return nil
 
-	case game.MessageTypeControllerJoin:
-		gs.sendTo("controller", game.MessageTypeInitialState, gs.state.Bytes())
+	case game.MessageTypeConductorConnected:
+		gs.state.ConductorIsConnected = true
+		gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
+		gs.broadcast(game.MessageTypeConductorConnected, nil)
+		return nil
+
+	case game.MessageTypeDisklavierConnected:
+		gs.state.DisklavierIsConnected = true
+		gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
+		gs.broadcast(game.MessageTypeDisklavierConnected, nil)
+		return nil
+
+	case game.MessageTypeConductorDisconnected:
+		gs.state.ConductorIsConnected = false
+		gs.broadcast(game.MessageTypeConductorDisconnected, nil)
+		return nil
+
+	case game.MessageTypeDisklavierDisconnected:
+		gs.state.DisklavierIsConnected = false
+		gs.broadcast(game.MessageTypeDisklavierDisconnected, nil)
 		return nil
 
 	case game.MessageTypeJoin:

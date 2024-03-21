@@ -20,9 +20,9 @@ import (
 )
 
 type model struct {
-	baseURL     baseurl.BaseURL
-	isConductor bool
-	inbox       <-chan *game.Message
+	role    string
+	baseURL baseurl.BaseURL
+	inbox   <-chan *game.Message
 
 	ws    *websocket.Conn
 	state *game.State
@@ -88,6 +88,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			phase := game.PhaseFromBytes(msg.Data)
 			m.state.Phase = phase
 
+		case game.MessageTypeConductorConnected:
+			m.state.ConductorIsConnected = true
+		case game.MessageTypeConductorDisconnected:
+			m.state.ConductorIsConnected = false
+
+		case game.MessageTypeDisklavierConnected:
+			m.state.DisklavierIsConnected = true
+		case game.MessageTypeDisklavierDisconnected:
+			m.state.DisklavierIsConnected = false
+
 		case game.MessageTypeBroadcastConnectedPlayer:
 			player := game.PlayerFromBytes(msg.Data)
 			m.state.Players[player.Fingerprint] = player
@@ -135,7 +145,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.MouseMsg:
-		for i, label := range menu {
+		if msg.Action != tea.MouseActionRelease {
+			return m, nil
+		}
+		for i, label := range m.menu() {
 			if zone.Get(label).InBounds(msg) {
 				m.contentInFocus = false
 				m.menuSelectionIndex = i
@@ -153,6 +166,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if zone.Get("Test MIDI Output").InBounds(msg) {
 			m.contentInFocus = true
 			return m, m.testMIDI
+		}
+
+		if zone.Get("Advance").InBounds(msg) {
+			return m, m.advance
+		} else if zone.Get("Restart").InBounds(msg) {
+			return m, m.restart
 		}
 
 		if zone.Get("Modal").InBounds(msg) {
@@ -213,13 +232,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch m.selectedMenuItem() {
 			case "MIDI Output Test":
 				return m, m.testMIDI
+			case "Performance Status":
+				switch m.selectedConductorButton() {
+				case "Advance":
+					return m, m.advance
+				case "Restart":
+					return m, m.restart
+				}
 			}
 
 		case "k", "up":
 			if !m.contentInFocus {
 				m.menuSelectionIndex -= 1
 				if m.menuSelectionIndex < 0 {
-					m.menuSelectionIndex = len(menu) - 1
+					m.menuSelectionIndex = len(m.menu()) - 1
 				}
 				return m, nil
 			}
@@ -230,11 +256,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.midiOutPortIndex = len(m.midiOutPorts) - 1
 				}
 				return m, nil
+			case "Performance Status":
+				buttonCount := len(m.conductorButtons())
+				if buttonCount > 1 {
+					m.conductorButtonIndex -= 1
+					if m.conductorButtonIndex < 0 {
+						m.conductorButtonIndex = buttonCount - 1
+					}
+				}
 			}
 		case "j", "down":
 			if !m.contentInFocus {
 				m.menuSelectionIndex += 1
-				if m.menuSelectionIndex >= len(menu) {
+				if m.menuSelectionIndex >= len(m.menu()) {
 					m.menuSelectionIndex = 0
 				}
 				return m, nil
@@ -246,6 +280,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.midiOutPortIndex = 0
 				}
 				return m, nil
+			case "Performance Status":
+				buttonCount := len(m.conductorButtons())
+				if buttonCount > 1 {
+					m.conductorButtonIndex += 1
+					if m.conductorButtonIndex > buttonCount+1 {
+						m.conductorButtonIndex = 0
+					}
+				}
 			}
 		}
 
@@ -258,8 +300,55 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+func (m model) menu() []string {
+	switch m.role {
+	case "conductor":
+		return []string{
+			"Performance Status",
+			"Message Log",
+		}
+	default:
+		return []string{
+			"Performance Status",
+			"MIDI Configuration",
+			"MIDI Output Test",
+			"Message Log",
+		}
+	}
+}
+
+func (m model) conductorButtons() []string {
+	if m.role != "conductor" {
+		return []string{}
+	}
+	switch m.state.Phase.Type {
+	case game.GamePhaseUninitialized:
+		return []string{"Advance"}
+	case game.GamePhaseLobby:
+		return []string{"Advance"}
+	case game.GamePhaseHero:
+		return []string{"Advance", "Restart"}
+	case game.GamePhaseProcessing:
+		return []string{}
+	case game.GamePhasePlayback:
+		return []string{}
+	case game.GamePhaseDone:
+		return []string{"Restart"}
+	default:
+		return []string{}
+	}
+}
+
+func (m model) selectedConductorButton() string {
+	buttons := m.conductorButtons()
+	if len(buttons) == 0 {
+		return ""
+	}
+	return buttons[m.conductorButtonIndex%len(buttons)]
+}
+
 func (m model) selectedMenuItem() string {
-	return menu[m.menuSelectionIndex]
+	return m.menu()[m.menuSelectionIndex]
 }
 
 func (m model) checkVersion() tea.Msg {
@@ -283,13 +372,22 @@ func (m model) checkMIDIOutPorts() tea.Msg {
 }
 
 func (m model) connect() tea.Msg {
-	conn, _, err := websocket.DefaultDialer.Dial(m.baseURL.WS(data.PathControllerWS), nil)
+	conn, _, err := websocket.DefaultDialer.Dial(m.baseURL.WS(data.PathControllerWS)+fmt.Sprintf("?role=%s", m.role), nil)
 	if err != nil {
 		return msgQuit(err.Error())
 	}
+	var msgType game.MessageType
+	switch m.role {
+	case "conductor":
+		msgType = game.MessageTypeConductorConnected
+	case "disklavier":
+		msgType = game.MessageTypeDisklavierConnected
+	default:
+		panic("unknown role")
+	}
 	if err := conn.WriteMessage(
 		websocket.BinaryMessage,
-		game.NewMessage(game.MessageTypeControllerJoin, "", nil).Bytes(),
+		game.NewMessage(msgType, m.role, nil).Bytes(),
 	); err != nil {
 		return msgQuit(err.Error())
 	}
@@ -313,6 +411,16 @@ func (m model) acceptMessage() tea.Msg {
 	default:
 		return msgQuit("unexpected message type")
 	}
+}
+
+func (m model) advance() tea.Msg {
+	http.Post(m.baseURL.Rest(data.PathAdvance), "", nil)
+	return nil
+}
+
+func (m model) restart() tea.Msg {
+	http.Post(m.baseURL.Rest(data.PathRestart), "", nil)
+	return nil
 }
 
 func (m model) testMIDI() tea.Msg {

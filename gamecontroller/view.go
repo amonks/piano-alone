@@ -42,6 +42,15 @@ var (
 				Background(xxxLight).
 				Foreground(xDark)
 
+	indicatorStyleOn = lipgloss.NewStyle().
+				Background(xxxDark).
+				Foreground(green).
+				Bold(true)
+	indicatorStyleOff = lipgloss.NewStyle().
+				Background(xxxDark).
+				Foreground(red).
+				Bold(true)
+
 	pageStyle = lipgloss.NewStyle().
 			Background(xxxDark).
 			Foreground(xxxLight)
@@ -97,12 +106,10 @@ var (
 	buttonStyle = lipgloss.NewStyle().
 			Background(lipgloss.Color("#93A1A1")).
 			Foreground(xxxDark).
-			Padding(0, 3).
-			MarginTop(1)
+			Padding(0, 3)
 	activeButtonStyle = buttonStyle.Copy().
 				Background(lipgloss.Color("#FDF6E3")).
 				Foreground(xxDark).
-				MarginRight(2).
 				Underline(true)
 )
 
@@ -131,14 +138,14 @@ func (m model) viewHeader() string {
 
 func (m model) viewModal() string {
 	return zone.Mark("Modal", modalStyle.Copy().Width(m.width).Height(m.height).Render(
-		modalHeaderStyle.Render(m.modal) + "\n" + modalDismisserStyle.Render("press any key to dismiss"),
+		modalHeaderStyle.Render(m.modal)+"\n"+modalDismisserStyle.Render("press any key to dismiss"),
 	))
 }
 
 func (m model) viewMenu() string {
 	content := strings.Builder{}
-	for _, item := range menu {
-		if item == menu[m.menuSelectionIndex] {
+	for _, item := range m.menu() {
+		if item == m.menu()[m.menuSelectionIndex] {
 			content.WriteString(zone.Mark(item, focusedMenuItemStyle.Render(item)) + "\n")
 		} else {
 			content.WriteString(zone.Mark(item, menuItemStyle.Render(item)) + "\n")
@@ -153,7 +160,7 @@ func (m model) viewMenu() string {
 
 func (m model) viewContent() string {
 	var content string
-	switch menu[m.menuSelectionIndex] {
+	switch m.menu()[m.menuSelectionIndex] {
 	case "Performance Status":
 		content = m.viewPerformanceStatus()
 	case "MIDI Configuration":
@@ -192,12 +199,16 @@ func (m model) viewMidiOutPorts() string {
 	)
 }
 
-func (m model) viewMidiOutputTest() string {
-	hasMidiOutPort := m.midiOutPortIndex < len(m.midiOutPorts)
+func renderButton(label string, isActive bool) string {
 	buttonStyle := buttonStyle
-	if m.contentInFocus && hasMidiOutPort {
+	if isActive {
 		buttonStyle = activeButtonStyle
 	}
+	return zone.Mark(label, buttonStyle.Render(label))
+}
+
+func (m model) viewMidiOutputTest() string {
+	hasMidiOutPort := m.midiOutPortIndex < len(m.midiOutPorts)
 	selectedPortMessage := "no MIDI out ports found"
 	if hasMidiOutPort {
 		selectedPortMessage = "MIDI Port: " + m.midiOutPorts[m.midiOutPortIndex].String()
@@ -205,7 +216,8 @@ func (m model) viewMidiOutputTest() string {
 	return joinVertical(
 		boxHeaderStyle.Render("MIDI Output Test"),
 		selectedPortMessage,
-		zone.Mark("Test MIDI Output", buttonStyle.Render("Test MIDI Output")),
+		"",
+		renderButton("Test MIDI Output", m.contentInFocus && hasMidiOutPort),
 	)
 }
 
@@ -213,6 +225,7 @@ func (m model) viewPerformanceStatus() string {
 	if m.state == nil {
 		return "nil state"
 	}
+
 	switch m.state.Phase.Type {
 	case game.GamePhaseUninitialized:
 		return joinVertical(
@@ -222,6 +235,8 @@ func (m model) viewPerformanceStatus() string {
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
 			"",
 			"",
+			m.viewConnectionStatus(),
+			m.viewConductorButtons(),
 		)
 	case game.GamePhaseLobby:
 		return joinVertical(
@@ -231,6 +246,8 @@ func (m model) viewPerformanceStatus() string {
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			"",
+			m.viewConnectionStatus(),
+			m.viewConductorButtons(),
 		)
 
 	case game.GamePhaseHero:
@@ -241,6 +258,8 @@ func (m model) viewPerformanceStatus() string {
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			m.viewConnectionStatus(),
+			m.viewConductorButtons(),
 		)
 
 	case game.GamePhaseProcessing:
@@ -251,6 +270,8 @@ func (m model) viewPerformanceStatus() string {
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			m.viewConnectionStatus(),
+			m.viewConductorButtons(),
 		)
 
 	case game.GamePhasePlayback:
@@ -261,6 +282,8 @@ func (m model) viewPerformanceStatus() string {
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			m.viewConnectionStatus(),
+			m.viewConductorButtons(),
 		)
 
 	case game.GamePhaseDone:
@@ -272,6 +295,8 @@ func (m model) viewPerformanceStatus() string {
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
 			"",
+			m.viewConnectionStatus(),
+			m.viewConductorButtons(),
 		)
 
 	default:
@@ -282,7 +307,37 @@ func (m model) viewPerformanceStatus() string {
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			m.viewConnectionStatus(),
+			m.viewConductorButtons(),
 		)
+	}
+}
+
+func (m model) viewConnectionStatus() string {
+	return joinVertical(
+		renderStatus("disklavier", m.state.DisklavierIsConnected),
+		renderStatus("conductor", m.state.ConductorIsConnected),
+	)
+}
+
+func (m model) viewConductorButtons() string {
+	buttons := m.conductorButtons()
+	button := m.selectedConductorButton()
+	if len(buttons) == 0 {
+		return ""
+	}
+	output := []string{""}
+	for _, b := range buttons {
+		output = append(output, renderButton(b, b == button))
+	}
+	return joinVertical(output...)
+}
+
+func renderStatus(name string, isConnected bool) string {
+	if isConnected {
+		return indicatorStyleOn.Render("•") + pageStyle.Render(" "+name)
+	} else {
+		return indicatorStyleOff.Render("•") + pageStyle.Render(" "+name)
 	}
 }
 

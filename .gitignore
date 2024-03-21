@@ -2,6 +2,7 @@ Certificates.p12
 .envrc
 website/main.wasm
 
+macos-client-universal.zip
 macos-client-universal
 main.wasm
 serve

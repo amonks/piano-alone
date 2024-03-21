@@ -14,14 +14,9 @@ import (
 )
 
 var (
+	fRole    = flag.String("role", "disklavier", "role: disklavier or conductor")
 	fBaseURL = flag.String("baseURL", "https://piano.computer", "base server url")
 
-	menu = []string{
-		"Performance Status",
-		"MIDI Configuration",
-		"MIDI Output Test",
-		"Message Log",
-	}
 	menuWidth = len("Performance Status") + 4
 )
 
@@ -30,7 +25,7 @@ func main() {
 	flag.Parse()
 	defer midi.CloseDriver()
 	p := tea.NewProgram(
-		model{baseURL: baseurl.From(*fBaseURL)},
+		model{baseURL: baseurl.From(*fBaseURL), role: *fRole},
 		tea.WithAltScreen(),
 		tea.WithMouseCellMotion(),
 	)
