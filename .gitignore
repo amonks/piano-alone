@@ -5,3 +5,5 @@ website/main.wasm
 macos-client-universal
 main.wasm
 serve
+
+node_modules

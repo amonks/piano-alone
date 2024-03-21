@@ -13,11 +13,14 @@ import (
 // than a delta series.
 type AbsTrack struct {
 	Events []AbsEvent
-	bpm    float64
 }
 
 func New() *AbsTrack {
 	return &AbsTrack{}
+}
+
+func (t *AbsTrack) Append(evs ...AbsEvent) {
+	t.Events = append(t.Events, evs...)
 }
 
 func (t *AbsTrack) Dur() time.Duration {

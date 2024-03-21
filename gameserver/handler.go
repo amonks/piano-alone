@@ -56,7 +56,7 @@ func (s *Handler) Start(ctx context.Context) error {
 			})
 		}
 	}()
-	f := songs.ExcerptSMF
+	f := songs.PreludeBergamasqueSMF
 	gs.Start(ctx, s.outbox, s.inbox, f)
 	return nil
 }

@@ -2,17 +2,17 @@
   id = "build"
   type = "short"
   dependencies = ["build-templates", "build-wasm", "generate", "generate-canvas-api-wrapper"]
-  cmd = "go build ./gameserver"
+  cmd = "go build -o ./serve ./gameserver"
 
 [[task]]
   id = "start"
   type = "long"
-  cmd = "./gameserver"
+  cmd = "./serve"
 
 [[task]]
   id = "dev"
   type = "long"
-  dependencies = ["generate", "build-wasm", "build-templates"]
+  dependencies = ["generate", "build-wasm", "build-templates", "build-css"]
   watch = ["**/*.go"]
   cmd = "go run ./gameserver"
 
@@ -26,6 +26,12 @@
     go run honnef.co/go/tools/cmd/staticcheck ./...
     go run golang.org/x/vuln/cmd/govulncheck ./...
   """
+
+[[task]]
+  id = "build-css"
+  type = "short"
+  cmd = "./node_modules/.bin/tailwindcss -i ./css/style.css -o ./templates/style.css"
+  watch = ["./css/**", "./templates/*.templ"]
 
 [[task]]
   id = "build-client"

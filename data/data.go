@@ -1,7 +1,7 @@
 package data
 
 const (
-	CurrentVersion = "1.5.0"
+	CurrentVersion = "1.6.0"
 )
 
 const (

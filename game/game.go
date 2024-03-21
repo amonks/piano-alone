@@ -147,7 +147,7 @@ func (m *Message) String() string {
 		phase := PhaseFromBytes(m.Data)
 		return fmt.Sprintf("%s: %s [%s]", m.Player, m.Type.String(), phase.Type.String())
 	default:
-		return fmt.Sprintf("%s: %s", m.Player, m.Type.String())
+		return m.Type.String()
 	}
 }
 

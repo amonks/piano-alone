@@ -16,7 +16,15 @@ import (
 )
 
 func main() {
-	baseURL := baseurl.Discover()
+	var (
+		doc  = js.Global().Get("document")
+		root = doc.Call("getElementById", "root")
+
+		baseURL = baseurl.Discover()
+
+		inbox  = make(chan *game.Message)
+		outbox = make(chan *game.Message)
+	)
 
 	fingerprint := storage.Session.Get("fingerprint")
 	if fingerprint == "" {
@@ -24,13 +32,11 @@ func main() {
 		storage.Session.Set("fingerprint", fingerprint)
 	}
 	log.Printf("fingerprint: %s", fingerprint)
+
 	wc, err := jsws.Open(baseURL.WS("/ws?fingerprint=" + fingerprint))
 	if err != nil {
 		panic(err)
 	}
-
-	inbox := make(chan *game.Message)
-	outbox := make(chan *game.Message)
 
 	if _, err := wc.OnMessage(func(bs []byte) {
 		inbox <- game.MessageFromBytes(bs)
@@ -53,7 +59,6 @@ func main() {
 		}
 	}()
 
-	root := js.Global().Get("document").Call("getElementById", "root")
 	gc := New(fingerprint, root)
 	if err := gc.Start(outbox, inbox); err != nil {
 		panic(err)

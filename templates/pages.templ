@@ -41,11 +41,10 @@ templ page(title string) {
 	<html>
 		<head>
 			<meta charset="utf-8"/>
-			<meta name="viewport" content="width=device-width"/>
+			<meta name="viewport" content="width=device-width, user-scalable=no"/>
 			<title>{ title } • piano.computer</title>
 			@style("style.css")
 			<link rel="stylesheet" href="https://use.typekit.net/ipj8hpy.css"/>
-			<script src="https://cdn.tailwindcss.com"></script>
 		</head>
 		<body>
 			{ children... }
@@ -56,9 +55,11 @@ templ page(title string) {
 templ App() {
 	@page("life online") {
 		<canvas></canvas>
-		<div id="piano"></div>
+		<div id="overlay" class="copy text-xl opacity-0 flex items-center justify-center absolute inset-0">
+			The performance hasn’t started yet.
+		</div>
+		<div id="piano" class="opacity-0"></div>
 		@script("wasm_exec.js")
 		@script("wasm.js")
-		@script("piano.js")
 	}
 }

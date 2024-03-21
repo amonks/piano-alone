@@ -85,6 +85,9 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			for f := range gs.state.Players {
 				fingerprints = append(fingerprints, f)
 			}
+			if len(fingerprints) == 0 {
+				return nil
+			}
 			track := abstrack.FromSMF(gs.state.Score, 0)
 			notes := track.CountNotes()
 			for i, note := range notes {
