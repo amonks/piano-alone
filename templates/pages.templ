@@ -1,5 +1,30 @@
 package templates
 
+import (
+	"monks.co/piano-alone/baseurl"
+	"monks.co/piano-alone/game"
+)
+
+templ App(perfs []*game.Performance ) {
+	@page("life online") {
+		<div id="app">
+			<canvas></canvas>
+			<div id="overlay" class="copy text-xl opacity-0 flex items-center justify-center absolute inset-0">
+				The performance hasn’t started yet.
+			</div>
+			<div id="piano" class="opacity-0"></div>
+		</div>
+		@script("wasm_exec.js")
+		@script("wasm.js")
+		<div id="page">
+			@container() {
+				@Performances(perfs)
+				@markdown("copy.md")
+			}
+		</div>
+	}
+}
+
 templ ComingSoon() {
 	@page("coming soon") {
 		@container() {
@@ -16,6 +41,27 @@ templ Download() {
 	}
 }
 
+templ Performances(ps []*game.Performance) {
+	<div id="performances" class="my-8">
+		<h2 class="strong text-2xl mb-2">Performances</h2>
+		<ol class="list-decimal mono">
+			for _, p := range ps {
+				<li class="mb-2">
+					{ p.Date.Format("Monday, Jan 02 2006 15:04") }:
+					{ p.Configuration.Composer }’s
+					if p.IsComplete {
+						<a href={ templ.SafeURL(p.MIDIFilePath(baseurl.NoHost)) }>
+							<em>{ p.Configuration.Title }.midi</em>
+						</a>
+					} else {
+						<em>{ p.Configuration.Title }</em>
+					}
+				</li>
+			}
+		</ol>
+	</div>
+}
+
 templ header() {
 	<header class="pb-6 pt-2 md:pt-12 border-b bg-black text-white">
 		<div class="display max-w-2xl px-2 md:pb-4 mx-auto">
@@ -24,7 +70,6 @@ templ header() {
 		</div>
 		<div class="mono max-w-2xl px-2 mx-auto">
 			<div class="text-xl"><span class="em">by</span> <a href="https://monks.co">Andrew Monks</a></div>
-			<div class="text-xl"><span class="em">streaming on</span> March 23, 2024</div>
 		</div>
 	</header>
 }
@@ -50,16 +95,4 @@ templ page(title string) {
 			{ children... }
 		</body>
 	</html>
-}
-
-templ App() {
-	@page("life online") {
-		<canvas></canvas>
-		<div id="overlay" class="copy text-xl opacity-0 flex items-center justify-center absolute inset-0">
-			The performance hasn’t started yet.
-		</div>
-		<div id="piano" class="opacity-0"></div>
-		@script("wasm_exec.js")
-		@script("wasm.js")
-	}
 }

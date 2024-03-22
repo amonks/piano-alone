@@ -8,6 +8,7 @@ import (
 
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/abstrack"
+	"monks.co/piano-alone/db"
 	"monks.co/piano-alone/game"
 	"monks.co/piano-alone/pianists"
 )
@@ -17,22 +18,26 @@ const (
 )
 
 type GameServer struct {
+	db *db.DB
+
 	send chan<- *game.Message
 	bus  chan *game.Message
 
 	state    *game.State
 	partials map[string]*smf.SMF
+
+	sentSwitchToVideoModal bool
 }
 
-func NewGame() *GameServer {
+func NewGame(db *db.DB) *GameServer {
 	return &GameServer{
+		db:       db,
 		state:    game.NewState(),
 		partials: map[string]*smf.SMF{},
 	}
 }
 
-func (gs *GameServer) Start(ctx context.Context, send chan<- *game.Message, recv <-chan *game.Message, song *smf.SMF) {
-	gs.state.Score = song
+func (gs *GameServer) Start(ctx context.Context, send chan<- *game.Message, recv <-chan *game.Message, songTitle, songComposer string, song *smf.SMF) error {
 	gs.send = send
 	gs.bus = make(chan *game.Message)
 
@@ -57,11 +62,12 @@ func (gs *GameServer) Start(ctx context.Context, send chan<- *game.Message, recv
 	for {
 		select {
 		case <-done:
-			return
+			return nil
 
 		case msg := <-msgs:
 			if err := gs.handleMessage(msg); err != nil {
 				log.Printf("msg '%s' produced error: %s", msg.Type, err)
+				return err
 			}
 		}
 	}
@@ -71,15 +77,23 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 	switch msg.Type {
 
 	case game.MessageTypeRestart:
-		score := gs.state.Score
+		conf := gs.state.Configuration
 		gs.state = game.NewState()
-		gs.state.Score = score
+		gs.state.Configuration = conf
 		gs.partials = map[string]*smf.SMF{}
-		gs.broadcast(game.MessageTypeInitialState, gs.state.Bytes())
+		gs.broadcast(game.MessageTypeState, gs.state.Bytes())
+		return nil
+
+	case game.MessageTypeBeginPerformance:
+		configuration := game.ConfigurationFromBytes(msg.Data)
+		gs.state.Phase = game.GamePhaseUninitialized
+		gs.state.Configuration = configuration
+		gs.broadcast(game.MessageTypeState, gs.state.Bytes())
+		gs.setPhase(game.GamePhaseLobby)
 		return nil
 
 	case game.MessageTypeAdvancePhase:
-		switch gs.state.Phase.Type {
+		switch gs.state.Phase {
 		case game.GamePhaseLobby:
 			var fingerprints []string
 			for f := range gs.state.Players {
@@ -88,7 +102,12 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			if len(fingerprints) == 0 {
 				return nil
 			}
-			track := abstrack.FromSMF(gs.state.Score, 0)
+			r := bytes.NewReader(gs.state.Configuration.Score)
+			f, err := smf.ReadFrom(r)
+			if err != nil {
+				return err
+			}
+			track := abstrack.FromSMF(f, 0)
 			notes := track.CountNotes()
 			for i, note := range notes {
 				player := fingerprints[i%len(fingerprints)]
@@ -102,7 +121,6 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 				gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, player.Notes)
 			}
 			gs.setPhase(game.GamePhaseHero)
-			gs.sendTo("disklavier", game.MessageTypeBroadcastControllerModal, []byte("switch output to video"))
 			return nil
 
 		case game.GamePhaseHero:
@@ -116,29 +134,36 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			}
 			file := smf.New()
 			file.Add(track.ToSMF())
-			gs.state.Rendition = file
 			var buf bytes.Buffer
-			if _, err := gs.state.Rendition.WriteTo(&buf); err != nil {
+			if _, err := file.WriteTo(&buf); err != nil {
 				return err
 			}
-			gs.broadcast(game.MessageTypeBroadcastCombinedTrack, buf.Bytes())
+			bs := buf.Bytes()
+			gs.state.Rendition = bs
+			if err := gs.db.SaveRendition(gs.state.Configuration.PerformanceID, gs.state.CountSubmittedTracks(), bs); err != nil {
+				return err
+			}
+			gs.sendTo("disklavier", game.MessageTypeSendRenditionToDisklavier, bs)
 			gs.setPhase(game.GamePhasePlayback)
 			return nil
 
 		case game.GamePhasePlayback:
 			gs.setPhase(game.GamePhaseDone)
+			return nil
+
+		default:
+			return nil
 		}
-		return nil
 
 	case game.MessageTypeConductorConnected:
 		gs.state.ConductorIsConnected = true
-		gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
+		gs.sendTo(msg.Player, game.MessageTypeState, gs.state.Bytes())
 		gs.broadcast(game.MessageTypeConductorConnected, nil)
 		return nil
 
 	case game.MessageTypeDisklavierConnected:
 		gs.state.DisklavierIsConnected = true
-		gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
+		gs.sendTo(msg.Player, game.MessageTypeState, gs.state.Bytes())
 		gs.broadcast(game.MessageTypeDisklavierConnected, nil)
 		return nil
 
@@ -161,7 +186,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			}
 		}
 		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateConnected
-		gs.sendTo(msg.Player, game.MessageTypeInitialState, gs.state.Bytes())
+		gs.sendTo(msg.Player, game.MessageTypeState, gs.state.Bytes())
 		gs.broadcast(game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[msg.Player].Bytes())
 		if notes := gs.state.Players[msg.Player].Notes; len(notes) > 0 {
 			gs.sendTo(msg.Player, game.MessageTypeAssignment, notes)
@@ -174,14 +199,6 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		}
 		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
 		gs.broadcast(game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
-		if gs.state.CountConnectedPlayers() == 0 {
-			score := gs.state.Score
-			gs.state = game.NewState()
-			gs.state.Score = score
-			gs.partials = map[string]*smf.SMF{}
-			gs.broadcast(game.MessageTypeInitialState, gs.state.Bytes())
-			return nil
-		}
 		return nil
 
 	case game.MessageTypeSubmitPartialTrack:
@@ -195,6 +212,10 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		}
 		gs.state.Players[msg.Player].HasSubmitted = true
 		gs.broadcast(game.MessageTypeBroadcastSubmittedTrack, []byte(msg.Player))
+		if !gs.sentSwitchToVideoModal {
+			gs.sentSwitchToVideoModal = true
+			gs.sendTo("disklavier", game.MessageTypeBroadcastControllerModal, []byte("switch output to video"))
+		}
 		return nil
 
 	default:
@@ -203,9 +224,8 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 	}
 }
 
-func (gs *GameServer) setPhase(phase game.GamePhase) {
-	log.Println("phase:", phase)
-	gs.state.Phase = game.NewPhase(phase)
+func (gs *GameServer) setPhase(phase game.Phase) {
+	gs.state.Phase = phase
 	gs.broadcast(game.MessageTypeBroadcastPhase, gs.state.Phase.Bytes())
 }
 

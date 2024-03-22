@@ -3,19 +3,24 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/a-h/templ"
 	"github.com/gorilla/websocket"
 	"monks.co/piano-alone/data"
+	"monks.co/piano-alone/db"
 	"monks.co/piano-alone/game"
 	"monks.co/piano-alone/songs"
 	"monks.co/piano-alone/templates"
 )
 
 type Handler struct {
+	db *db.DB
+
 	disklavierConn *websocket.Conn
 	conductorConn  *websocket.Conn
 	conns          map[string]*websocket.Conn
@@ -34,7 +39,14 @@ func NewHandler() *Handler {
 }
 
 func (s *Handler) Start(ctx context.Context) error {
-	gs := NewGame()
+	db, err := db.OpenDB(os.Getenv("SQLITE_DATABASE_PATH"))
+	if err != nil {
+		return err
+	}
+
+	s.db = db
+	gs := NewGame(db)
+
 	go func() {
 		for m := range s.outbox {
 			if m.Player == "*" {
@@ -59,27 +71,34 @@ func (s *Handler) Start(ctx context.Context) error {
 			})
 		}
 	}()
-	f := songs.PreludeBergamasqueSMF
-	gs.Start(ctx, s.outbox, s.inbox, f)
-	return nil
+	return gs.Start(ctx, s.outbox, s.inbox,
+		"Prelude in C♯ Minor", "Sergei Rachmaninoff", songs.ExcerptSMF)
 }
 
 func (s *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	mux := http.NewServeMux()
 
 	// pages
-	mux.Handle("GET /", gzipMiddleware(templ.Handler(templates.ComingSoon())))
-	mux.Handle("GET /app", gzipMiddleware(templ.Handler(templates.App())))
+	mux.Handle("GET /", gzipMiddleware(http.HandlerFunc(s.HandleApp)))
 	mux.Handle("GET /download", gzipMiddleware(templ.Handler(templates.Download())))
 
 	// files
 	mux.HandleFunc("GET /main.wasm", file("main.wasm"))
 
-	// API
+	// API: client update
 	mux.HandleFunc(data.PathLatestClientVersion, text(data.CurrentVersion))
 	mux.HandleFunc(data.PathLatestClientDownload, file("macos-client-universal"))
+	// API: ws
 	mux.HandleFunc(data.PathPlayerWS, s.HandlePlayerWebsocket)
 	mux.HandleFunc(data.PathControllerWS, s.HandleControllerWebsocket)
+	// API: performances
+	mux.HandleFunc(data.PathSchedulePerformance, s.HandleSchedulePerformance)
+	mux.HandleFunc(data.PathScheduledPerformances, s.HandleScheduledPerformances)
+	mux.HandleFunc(data.PathFeaturedPerformances, s.HandleFeaturedPerformances)
+	mux.HandleFunc(data.PathBeginPerformance, s.HandleBeginPerformance)
+	mux.HandleFunc(data.PathDeletePerformance, s.HandleDeletePerformance)
+	mux.HandleFunc(data.PathMIDIFile, s.HandleMIDIFile)
+	// API: current performance
 	mux.HandleFunc(data.PathRestart, s.HandleRestart)
 	mux.HandleFunc(data.PathAdvance, s.HandleAdvance)
 
@@ -153,20 +172,104 @@ func text(t string) http.HandlerFunc {
 	}
 }
 
+func (s *Handler) HandleApp(w http.ResponseWriter, req *http.Request) {
+	ps, err := s.db.GetFeaturedPerformances()
+	if err != nil {
+		http.Error(w, "internal error", 500)
+	}
+	h := templ.Handler(templates.App(ps))
+	h.ServeHTTP(w, req)
+}
+
 var upgrader = websocket.Upgrader{}
 
 func (s *Handler) HandleRestart(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathRestart)
 	s.inbox <- game.NewMessage(game.MessageTypeRestart, "", nil)
 	w.Write([]byte("ok"))
 }
 
 func (s *Handler) HandleAdvance(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathAdvance)
 	s.inbox <- game.NewMessage(game.MessageTypeAdvancePhase, "", nil)
 	w.Write([]byte("ok"))
 }
 
+func (s *Handler) HandleSchedulePerformance(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathSchedulePerformance)
+	bs, err := io.ReadAll(req.Body)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	p := game.PerformanceFromBytes(bs)
+	if err := s.db.SchedulePerformance(p); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Write([]byte("ok"))
+}
+
+func (s *Handler) HandleFeaturedPerformances(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathFeaturedPerformances)
+	ps, err := s.db.GetFeaturedPerformances()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	h := templ.Handler(templates.Performances(ps))
+	h.ServeHTTP(w, req)
+}
+
+func (s *Handler) HandleScheduledPerformances(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathScheduledPerformances)
+	ps, err := s.db.GetScheduledPerformances()
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	bs := game.PerformancesToBytes(ps)
+	w.Write(bs)
+	return
+}
+
+func (s *Handler) HandleBeginPerformance(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathBeginPerformance)
+	id := req.PathValue("id")
+	perf, err := s.db.GetPerformance(id)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	s.inbox <- game.NewMessage(game.MessageTypeBeginPerformance, "", perf.Configuration.Bytes())
+	w.Write([]byte("ok"))
+}
+
+func (s *Handler) HandleMIDIFile(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathMIDIFile)
+	id := req.PathValue("id")
+	fmt.Println("id", id)
+	bs, err := s.db.GetMIDIFile(id)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Header().Set("Content-type", "audio/midi")
+	w.Write(bs)
+}
+
+func (s *Handler) HandleDeletePerformance(w http.ResponseWriter, req *http.Request) {
+	log.Println("<-", data.PathDeletePerformance)
+	id := req.PathValue("id")
+	if err := s.db.DeletePerformance(id); err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+	w.Write([]byte("ok"))
+}
+
 func (s *Handler) HandleControllerWebsocket(w http.ResponseWriter, req *http.Request) {
-	log.Printf("<- controller")
+	log.Println("<-", data.PathControllerWS)
 	role := req.URL.Query().Get("role")
 	if role != "conductor" {
 		role = "disklavier"
@@ -192,7 +295,7 @@ func (s *Handler) HandleControllerWebsocket(w http.ResponseWriter, req *http.Req
 }
 
 func (s *Handler) HandlePlayerWebsocket(w http.ResponseWriter, req *http.Request) {
-	log.Printf("<- player")
+	log.Println("<-", data.PathPlayerWS)
 	fingerprint := req.URL.Query().Get("fingerprint")
 	if fingerprint == "" {
 		http.Error(w, "no fingerprint specified", 400)

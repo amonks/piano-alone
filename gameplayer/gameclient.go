@@ -5,13 +5,17 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"syscall/js"
 	"time"
 
 	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/smf"
 	"monks.co/piano-alone/abstrack"
+	"monks.co/piano-alone/baseurl"
+	"monks.co/piano-alone/data"
 	"monks.co/piano-alone/game"
 	"monks.co/piano-alone/recorder"
 )
@@ -22,9 +26,17 @@ const (
 )
 
 var (
-	doc       = js.Global().Get("document")
-	overlay   = doc.Call("getElementById", "overlay")
-	canv      = doc.Call("querySelector", "canvas")
+	doc = js.Global().Get("document")
+
+	html = doc.Call("querySelector", "html")
+
+	page         = doc.Call("getElementById", "page")
+	performances = doc.Call("getElementById", "performances")
+
+	app     = doc.Call("getElementById", "app")
+	overlay = doc.Call("getElementById", "overlay")
+	canv    = doc.Call("querySelector", "canvas")
+
 	usesTouch = js.Global().Call("hasOwnProperty", "ontouchstart").Bool()
 )
 
@@ -47,7 +59,6 @@ func New(fingerprint string, root js.Value) *GameClient {
 	return &GameClient{
 		state:       game.NewState(),
 		fingerprint: fingerprint,
-		recorder:    recorder.New(120),
 	}
 }
 
@@ -64,7 +75,6 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 		c.fingerprint,
 		[]byte(c.fingerprint),
 	)
-	go func() { c.loopback <- msgInit{} }()
 	for {
 		var m message
 		var ok bool
@@ -93,6 +103,8 @@ type (
 	msgStartHeroIntro      struct{}
 	msgStartRecording      struct{}
 	msgHeroDone            struct{}
+	msgLookAtDisklavier    struct{}
+	msgPerformanceIsOver   struct{}
 	msgKey                 = recorder.Event
 )
 
@@ -118,10 +130,15 @@ func (c *GameClient) handleMessage(m message) error {
 
 	case msgInit:
 		go func() {
+			hide(page, "1s")
+			time.Sleep(time.Second)
+			html.Get("classList").Call("add", "app")
+
 			show(overlay, "1s")
 			time.Sleep(time.Second / 2)
 			show(doc.Call("getElementById", "piano"), "1s")
 			time.Sleep(time.Second * 2)
+
 			c.loopback <- msgPianoAnimationReady{}
 		}()
 
@@ -150,10 +167,10 @@ func (c *GameClient) handleMessage(m message) error {
 			})
 			if usesTouch {
 				canv.Call("addEventListener", "touchend", handler)
-				overlay.Set("innerText", "Tap the screen to continue.")
+				overlay.Set("innerText", "Tap the screen to begin.")
 			} else {
 				canv.Call("addEventListener", "click", handler)
-				overlay.Set("innerText", "Click anywhere to continue.")
+				overlay.Set("innerText", "Click anywhere to begin.")
 			}
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
@@ -178,7 +195,7 @@ func (c *GameClient) handleMessage(m message) error {
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
-			overlay.Set("innerText", "But If we each handle just a few…")
+			overlay.Set("innerText", "But if we each handle just a few…")
 			show(overlay, "0.5s")
 			time.Sleep(time.Second / 2)
 			c.piano.HideInactiveKeys(keys, time.Second*4)
@@ -199,7 +216,7 @@ func (c *GameClient) handleMessage(m message) error {
 			})
 			time.Sleep(time.Second * 4)
 
-			overlay.Set("innerText", "Let’s handle these keys here.")
+			overlay.Set("innerText", "Focus on these keys here.")
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
 			hide(overlay, "0.5s")
@@ -220,7 +237,7 @@ func (c *GameClient) handleMessage(m message) error {
 			c.startTutorialAt = time.Now()
 			tutorialDone := c.animate(c.tutorialSceneGraph)
 			time.Sleep(screenDuration)
-			for i, _ := range keys {
+			for i := range keys {
 				buttonEl := c.piano.buttons[i].el
 				style := buttonEl.Get("style")
 				style.Call("setProperty", "border", "solid 15px red")
@@ -228,27 +245,40 @@ func (c *GameClient) handleMessage(m message) error {
 				style.Call("removeProperty", "border")
 			}
 			time.Sleep(time.Second)
-			for i, _ := range keys {
+			for i := range keys {
 				buttonEl := c.piano.buttons[i].el
 				style := buttonEl.Get("style")
 				style.Call("setProperty", "border", "solid 15px red")
 			}
 			time.Sleep(time.Second)
-			for i, _ := range keys {
+			for i := range keys {
 				buttonEl := c.piano.buttons[i].el
 				style := buttonEl.Get("style")
 				style.Call("removeProperty", "border")
 			}
 
 			<-tutorialDone
+			time.Sleep(time.Second)
 
-			overlay.Set("innerText", "I hope you’ll get the hang of it soon.")
+			overlay.Set("innerText", "That’s all there is to it!")
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
 			overlay.Set("innerHTML", "Our score is Rachmaninoff’s <em>Prelude in C♯ Minor</em>.")
+			show(overlay, "0.5s")
+			time.Sleep(time.Second * 2)
+			hide(overlay, "0.5s")
+			time.Sleep(time.Second)
+
+			overlay.Set("innerHTML", "We’ll each record our parts alone.")
+			show(overlay, "0.5s")
+			time.Sleep(time.Second * 2)
+			hide(overlay, "0.5s")
+			time.Sleep(time.Second)
+
+			overlay.Set("innerHTML", "Then, we’ll listen to all our parts together on the Disklavier.")
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
 			hide(overlay, "0.5s")
@@ -265,6 +295,7 @@ func (c *GameClient) handleMessage(m message) error {
 		}()
 
 	case msgStartRecording:
+		c.recorder = recorder.New(120)
 		c.startPlayingAt = time.Now()
 		c.animate(c.performanceSceneGraph)
 
@@ -280,19 +311,58 @@ func (c *GameClient) handleMessage(m message) error {
 			panic(err)
 		}
 		c.send <- game.NewMessage(game.MessageTypeSubmitPartialTrack, "", bs)
+		go func() { c.loopback <- msgLookAtDisklavier{} }()
+
+	case msgLookAtDisklavier:
+		overlay.Set("innerHTML", "Done!<br />When everyone else is finished, we’ll hear our performance on the disklavier.")
+		show(overlay, "0.5s")
+		time.Sleep(time.Second * 2)
+
+	case msgPerformanceIsOver:
+		go func() {
+			if resp, err := http.Get(baseurl.NoHost.Rest(data.PathFeaturedPerformances)); err == nil {
+				defer resp.Body.Close()
+				if html, err := io.ReadAll(resp.Body); err == nil {
+					fmt.Println(string(html))
+					performances.Set("outerHTML", string(html))
+				}
+			}
+			hide(app, "1s")
+			time.Sleep(time.Second)
+
+			html.Get("classList").Call("remove", "app")
+			show(page, "1s")
+		}()
 
 	case msgKey:
-		c.recorder.Record(m)
+		if c.recorder != nil {
+			c.recorder.Record(m)
+		}
 
 	case *game.Message:
 		switch m.Type {
 
-		case game.MessageTypeInitialState:
+		case game.MessageTypeState:
 			c.state = game.StateFromBytes(m.Data)
+			if c.state.Phase != game.GamePhaseUninitialized &&
+				c.state.Phase != game.GamePhaseDone {
+				go func() { c.loopback <- msgInit{} }()
+			}
 
 		case game.MessageTypeBroadcastPhase:
-			msg := game.PhaseFromBytes(m.Data)
-			c.state.Phase = msg
+			before := c.state.Phase
+			after := game.PhaseFromBytes(m.Data)
+			c.state.Phase = after
+			if before == game.GamePhaseUninitialized && after != game.GamePhaseUninitialized {
+				go func() { c.loopback <- msgInit{} }()
+			} else {
+				switch after {
+				case game.GamePhaseProcessing:
+					go func() { c.loopback <- msgLookAtDisklavier{} }()
+				case game.GamePhaseDone:
+					go func() { c.loopback <- msgPerformanceIsOver{} }()
+				}
+			}
 
 		case game.MessageTypeBroadcastConnectedPlayer:
 			player := game.PlayerFromBytes(m.Data)
@@ -304,7 +374,12 @@ func (c *GameClient) handleMessage(m message) error {
 		case game.MessageTypeAssignment:
 			me := c.state.Players[c.fingerprint]
 			me.Notes = m.Data
-			c.myScore = NewScore(abstrack.FromSMF(c.state.Score, 0).Select(me.Notes))
+			r := bytes.NewReader(c.state.Configuration.Score)
+			smf, err := smf.ReadFrom(r)
+			if err != nil {
+				return err
+			}
+			c.myScore = NewScore(abstrack.FromSMF(smf, 0).Select(me.Notes))
 			c.tutorialScore = BuildTutorialScore(me.Notes)
 			if c.pianoAnimationReady {
 				go func() { c.loopback <- msgShowClickthrough{} }()
@@ -316,14 +391,6 @@ func (c *GameClient) handleMessage(m message) error {
 				c.state.Players[fingerprint] = &game.Player{}
 			}
 			c.state.Players[fingerprint].HasSubmitted = true
-
-		case game.MessageTypeBroadcastCombinedTrack:
-			r := bytes.NewReader(m.Data)
-			rendition, err := smf.ReadFrom(r)
-			if err != nil {
-				return fmt.Errorf("error reading combined smf: %w", err)
-			}
-			c.state.Rendition = rendition
 
 		default:
 			log.Printf("not handling message (type: '%s')", m.Type.String())

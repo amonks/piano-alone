@@ -591,6 +591,15 @@ video {
   margin-right: auto;
 }
 
+.my-8 {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
 .mb-6 {
   margin-bottom: 1.5rem;
 }
@@ -601,6 +610,10 @@ video {
 
 .max-w-2xl {
   max-width: 42rem;
+}
+
+.list-decimal {
+  list-style-type: decimal;
 }
 
 .items-center {
@@ -671,22 +684,6 @@ video {
 }
 
 html {
-  overflow: hidden;
-  body {
-    -webkit-user-select: none;
-       -moz-user-select: none;
-            user-select: none;
-    touch-action: none;
-  }
-  #overlay {
-    pointer-events: none;
-    width: 100%;
-    height: 70dvh;
-  }
-  canvas {
-    width: 100%;
-    height: 70dvh;
-  }
   background: #f7f0e1;
   .display {
     font-family: eurostile-extended, sans-serif;
@@ -703,6 +700,10 @@ html {
     font-family: attribute-mono;
     font-weight: 300;
     font-style: normal;
+    em,
+    .em {
+      font-style: italic;
+    }
   }
   a {
     text-decoration: underline;
@@ -728,88 +729,115 @@ html {
   }
 }
 
-.markdown {
-  h1 {
-    font-size: 2.25rem;
-    /* 36px */
-    line-height: 2.5rem;
-    /* 40px */
+html.app {
+  overflow: hidden;
+  #page {
+    display: none;
   }
-  h2 {
-    padding-top: 2.5rem;
-    font-size: 1.5rem;
-    /* 24px */
-    line-height: 2rem;
-    /* 32px */
+  body {
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+    touch-action: none;
   }
-  h1,
-  h2 {
-    margin-bottom: 0.4rem;
+  #overlay {
+    pointer-events: none;
+    width: 100%;
+    height: 70dvh;
+    padding: 1rem;
   }
-  p,
-  ul,
-  pre,
-  li {
-    margin-bottom: 0.8rem;
+  canvas {
+    width: 100%;
+    height: 70dvh;
   }
-  pre {
-    margin: 0.8rem -0.8rem;
-    padding: 0.4rem 0.8rem;
-    background-color: rgba(30, 41, 59, 0.1);
-    font-size: 1rem;
-  }
-  ul {
-    margin-left: 2.4rem;
-    list-style-type: disc;
-    list-style-position: outside;
+  #piano {
+    position: relative;
+    width: 100%;
+    height: 30dvh;
+    --key-width: calc(100% / 52);
+    --half-key-width: calc(var(--key-width) * 0.5);
+    --negative-quarter-key-width: calc(var(--key-width) * -0.25);
+    --key-height: 100%;
+    --half-key-height: calc(var(--key-height) * 0.5);
+    .button {
+      position: absolute;
+      top: 0;
+      transition-property: border, left, height, width;
+      transition-duration: 0;
+      border: 1px solid black;
+      border-radius: 0 0 5px 5px;
+      box-sizing: border-box;
+    }
+    .key {
+      transition: opacity 1s;
+      border: 1px solid black;
+      border-radius: 0 0 5px 5px;
+      display: inline-block;
+      box-sizing: border-box;
+    }
+    .key.white {
+      background-color: white;
+      z-index: -1;
+      width: var(--key-width);
+      height: var(--key-height);
+    }
+    .key.black {
+      vertical-align: top;
+      background-color: black;
+      position: relative;
+      width: var(--half-key-width);
+      height: var(--half-key-height);
+      margin-right: var(--negative-quarter-key-width);
+    }
+    .key.C,
+    .key.D,
+    .key.F,
+    .key.G,
+    .key.A {
+      margin-right: var(--negative-quarter-key-width);
+    }
   }
 }
 
-#piano {
-  position: relative;
-  width: 100%;
-  height: 30dvh;
-  --key-width: calc(100% / 52);
-  --half-key-width: calc(var(--key-width) * 0.5);
-  --negative-quarter-key-width: calc(var(--key-width) * -0.25);
-  --key-height: 100%;
-  --half-key-height: calc(var(--key-height) * 0.5);
-  .button {
-    position: absolute;
-    top: 0;
-    transition-property: border, left, height, width;
-    transition-duration: 0;
-    border: 1px solid black;
-    border-radius: 0 0 5px 5px;
-    box-sizing: border-box;
+html:not(.app) {
+  #app {
+    display: none;
   }
-  .key {
-    transition: opacity 1s;
-    border: 1px solid black;
-    border-radius: 0 0 5px 5px;
-    display: inline-block;
-    box-sizing: border-box;
-  }
-  .key.white {
-    background-color: white;
-    z-index: -1;
-    width: var(--key-width);
-    height: var(--key-height);
-  }
-  .key.black {
-    vertical-align: top;
-    background-color: black;
-    position: relative;
-    width: var(--half-key-width);
-    height: var(--half-key-height);
-    margin-right: var(--negative-quarter-key-width);
-  }
-  .key.C,
-  .key.D,
-  .key.F,
-  .key.G,
-  .key.A {
-    margin-right: var(--negative-quarter-key-width);
+  .markdown {
+    h1 {
+      font-size: 2.25rem;
+      /* 36px */
+      line-height: 2.5rem;
+      /* 40px */
+    }
+    h2 {
+      padding-top: 2.5rem;
+      font-size: 1.5rem;
+      /* 24px */
+      line-height: 2rem;
+      /* 32px */
+    }
+    h1,
+    h2 {
+      margin-bottom: 0.4rem;
+    }
+    p,
+    ul,
+    pre,
+    li {
+      margin-bottom: 0.8rem;
+    }
+    pre {
+      margin: 0.8rem -0.8rem;
+      padding: 0.4rem 0.8rem;
+      background-color: rgba(30, 41, 59, 0.1);
+      font-size: 1rem;
+    }
+    ul {
+      margin-left: 2.4rem;
+      list-style-type: disc;
+      list-style-position: outside;
+    }
   }
 }
 

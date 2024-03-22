@@ -13,7 +13,7 @@
   id = "dev"
   type = "long"
   dependencies = ["generate", "build-wasm", "build-templates", "build-css"]
-  watch = ["**/*.go"]
+  watch = ["**/*.go", "css/*.css"]
   cmd = "go run ./gameserver"
 
 [[task]]

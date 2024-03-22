@@ -3,14 +3,12 @@
 package main
 
 import (
-	"crypto/rand"
-	"encoding/hex"
-	"io"
 	"log"
 	"syscall/js"
 
 	"monks.co/piano-alone/baseurl"
 	"monks.co/piano-alone/game"
+	"monks.co/piano-alone/id"
 	"monks.co/piano-alone/jsws"
 	"monks.co/piano-alone/storage"
 )
@@ -28,7 +26,7 @@ func main() {
 
 	fingerprint := storage.Session.Get("fingerprint")
 	if fingerprint == "" {
-		fingerprint = randomID()
+		fingerprint = id.Random128()
 		storage.Session.Set("fingerprint", fingerprint)
 	}
 	log.Printf("fingerprint: %s", fingerprint)
@@ -63,10 +61,4 @@ func main() {
 	if err := gc.Start(outbox, inbox); err != nil {
 		panic(err)
 	}
-}
-
-func randomID() string {
-	bs := make([]byte, 128)
-	io.ReadFull(rand.Reader, bs)
-	return hex.EncodeToString(bs)
 }

@@ -3,6 +3,9 @@ kill_signal = "SIGINT"
 kill_timeout = 15
 primary_region = "ord"
 
+[env]
+  SQLITE_DATABASE_PATH="/data/performances.db"
+
 [build]
   dockerfile = "Dockerfile"
 

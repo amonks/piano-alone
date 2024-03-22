@@ -22,12 +22,15 @@ import (
 type model struct {
 	role    string
 	baseURL baseurl.BaseURL
-	inbox   <-chan *game.Message
 
 	ws    *websocket.Conn
 	state *game.State
 	midi  []byte
 	log   []*game.Message
+	debug []string
+
+	scheduledPerformances     []*game.Performance
+	scheduledPerformanceIndex int
 
 	width  int
 	height int
@@ -43,20 +46,20 @@ type model struct {
 	midiOutPorts     midi.OutPorts
 	midiOutPortIndex int
 
-	connection    string
 	latestVersion string
 
 	output string
 }
 
 type (
-	msgTick               time.Time
-	msgQuit               string
-	msgDismissModal       string
-	msgGotMIDIOutputPorts midi.OutPorts
-	msgVersion            string
-	msgGotWSClient        *websocket.Conn
-	msgGotWSMessage       *game.Message
+	msgGotScheduledPerformances []*game.Performance
+	msgTick                     time.Time
+	msgQuit                     string
+	msgGotMIDIOutputPorts       midi.OutPorts
+	msgVersion                  string
+	msgGotWSClient              *websocket.Conn
+	msgGotWSMessage             *game.Message
+	msgStartedPerformance       string
 )
 
 func (m model) Init() tea.Cmd {
@@ -65,10 +68,29 @@ func (m model) Init() tea.Cmd {
 		m.checkMIDIOutPorts,
 		m.connect,
 		m.tick,
+		m.checkScheduledPerformances,
 	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case msgTick, tea.KeyMsg, tea.MouseMsg, tea.WindowSizeMsg:
+	case msgGotWSClient:
+		m.debug = append(m.debug, "msgGotWSClient")
+	case msgGotWSMessage:
+		m.debug = append(m.debug, msg.Type.String())
+	case msgVersion:
+		m.debug = append(m.debug, "msgVersion: "+string(msg))
+	case msgGotMIDIOutputPorts:
+		m.debug = append(m.debug, fmt.Sprintf("msgGotMIDIOutputPorts: %d ports", len(msg)))
+	case msgGotScheduledPerformances:
+		m.debug = append(m.debug, fmt.Sprintf("msgGotScheduledPerformances: %d performances", len(msg)))
+	case msgStartedPerformance:
+		m.debug = append(m.debug, fmt.Sprintf("msgStartedPerformance: %s", string(msg)))
+	default:
+		m.debug = append(m.debug, fmt.Sprintf("%+v", msg))
+	}
+
 	switch msg := msg.(type) {
 
 	case msgTick:
@@ -81,33 +103,41 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case msgGotWSMessage:
 		m.log = append(m.log, msg)
 		switch msg.Type {
-		case game.MessageTypeInitialState:
+		case game.MessageTypeState:
 			m.state = game.StateFromBytes(msg.Data)
+			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastPhase:
 			phase := game.PhaseFromBytes(msg.Data)
 			m.state.Phase = phase
+			return m, m.acceptMessage
 
 		case game.MessageTypeConductorConnected:
 			m.state.ConductorIsConnected = true
+			return m, m.acceptMessage
 		case game.MessageTypeConductorDisconnected:
 			m.state.ConductorIsConnected = false
+			return m, m.acceptMessage
 
 		case game.MessageTypeDisklavierConnected:
 			m.state.DisklavierIsConnected = true
+			return m, m.acceptMessage
 		case game.MessageTypeDisklavierDisconnected:
 			m.state.DisklavierIsConnected = false
+			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastConnectedPlayer:
 			player := game.PlayerFromBytes(msg.Data)
 			m.state.Players[player.Fingerprint] = player
+			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastDisconnectedPlayer:
-			fingerprint := string(msg.Data)
-			m.state.Players[fingerprint].ConnectionState = game.ConnectionStateDisconnected
+			m.state.Players[string(msg.Data)].ConnectionState = game.ConnectionStateDisconnected
+			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastControllerModal:
 			m.modal = string(msg.Data)
+			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastSubmittedTrack:
 			fingerprint := string(msg.Data)
@@ -115,16 +145,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.state.Players[fingerprint] = &game.Player{}
 			}
 			m.state.Players[fingerprint].HasSubmitted = true
+			return m, m.acceptMessage
 
-		case game.MessageTypeBroadcastCombinedTrack:
+		case game.MessageTypeSendRenditionToDisklavier:
 			m.midi = msg.Data
 			return m, tea.Batch(
 				m.playSong,
 				m.acceptMessage,
 			)
+
+		default:
+			return m, m.acceptMessage
 		}
 
-		return m, m.acceptMessage
+	case msgGotScheduledPerformances:
+		m.scheduledPerformances = []*game.Performance(msg)
+		return m, nil
 
 	case msgQuit:
 		m.output = string(msg)
@@ -187,6 +223,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 
+		return m, nil
+
 	case tea.KeyMsg:
 		if m.quitting != "" {
 			if msg.String() == m.quitting {
@@ -213,12 +251,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			} else {
 				m.quitting = msg.String()
+				return m, nil
 			}
 
 		case "u", "U":
 			if m.latestVersion != "" && data.CurrentVersion != m.latestVersion {
 				return m, m.updateBinary
 			}
+			return m, nil
 
 		case "tab":
 			m.contentInFocus = !m.contentInFocus
@@ -230,64 +270,68 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			switch m.selectedMenuItem() {
+
 			case "MIDI Output Test":
 				return m, m.testMIDI
+
+			case "Start Performance":
+				m.menuSelectionIndex = 1
+				m.contentInFocus = false
+				return m, m.startPerformance
+
 			case "Performance Status":
 				switch m.selectedConductorButton() {
+
 				case "Advance":
 					return m, m.advance
+
 				case "Restart":
 					return m, m.restart
+
+				default:
+					return m, nil
 				}
 			}
-
 		case "k", "up":
 			if !m.contentInFocus {
-				m.menuSelectionIndex -= 1
-				if m.menuSelectionIndex < 0 {
-					m.menuSelectionIndex = len(m.menu()) - 1
-				}
+				m.menuSelectionIndex = decrement(m.menuSelectionIndex, len(m.menu()))
 				return m, nil
 			}
 			switch m.selectedMenuItem() {
-			case "MIDI Configuration":
-				m.midiOutPortIndex -= 1
-				if m.midiOutPortIndex < 0 {
-					m.midiOutPortIndex = len(m.midiOutPorts) - 1
-				}
+
+			case "Start Performance":
+				m.scheduledPerformanceIndex = decrement(m.scheduledPerformanceIndex, len(m.scheduledPerformances))
 				return m, nil
+
+			case "MIDI Configuration":
+				m.midiOutPortIndex = decrement(m.midiOutPortIndex, len(m.midiOutPorts))
+				return m, nil
+
 			case "Performance Status":
-				buttonCount := len(m.conductorButtons())
-				if buttonCount > 1 {
-					m.conductorButtonIndex -= 1
-					if m.conductorButtonIndex < 0 {
-						m.conductorButtonIndex = buttonCount - 1
-					}
-				}
+				m.conductorButtonIndex = decrement(m.conductorButtonIndex, len(m.conductorButtons()))
+				return m, nil
 			}
 		case "j", "down":
 			if !m.contentInFocus {
-				m.menuSelectionIndex += 1
-				if m.menuSelectionIndex >= len(m.menu()) {
-					m.menuSelectionIndex = 0
-				}
+				m.menuSelectionIndex = increment(m.menuSelectionIndex, len(m.menu()))
 				return m, nil
 			}
 			switch m.selectedMenuItem() {
-			case "MIDI Configuration":
-				m.midiOutPortIndex += 1
-				if m.midiOutPortIndex >= len(m.midiOutPorts) {
-					m.midiOutPortIndex = 0
-				}
+
+			case "Start Performance":
+				m.scheduledPerformanceIndex = increment(m.scheduledPerformanceIndex, len(m.scheduledPerformances))
 				return m, nil
+
+			case "MIDI Configuration":
+				m.midiOutPortIndex = increment(m.midiOutPortIndex, len(m.midiOutPorts))
+				return m, nil
+
 			case "Performance Status":
-				buttonCount := len(m.conductorButtons())
-				if buttonCount > 1 {
-					m.conductorButtonIndex += 1
-					if m.conductorButtonIndex > buttonCount+1 {
-						m.conductorButtonIndex = 0
-					}
-				}
+				m.conductorButtonIndex = increment(m.conductorButtonIndex, len(m.conductorButtons()))
+				return m, nil
+
+			default:
+				return m, nil
 			}
 		}
 
@@ -295,24 +339,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
+
+	default:
+		return m, nil
 	}
 
 	return m, nil
 }
 
+type MenuItem string
+
+const (
+	MenuItemStartPerformance  = "Start Performance"
+	MenuItemPerformanceStatus = "Performance Status"
+	MenuItemDebug             = "Debug"
+	MenuItemMIDIConfiguration = "MIDI Configuration"
+	MenuItemMIDIOutputTest    = "MIDI Output Test"
+)
+
 func (m model) menu() []string {
 	switch m.role {
 	case "conductor":
 		return []string{
-			"Performance Status",
-			"Message Log",
+			MenuItemStartPerformance,
+			MenuItemPerformanceStatus,
+			MenuItemDebug,
 		}
 	default:
 		return []string{
-			"Performance Status",
-			"MIDI Configuration",
-			"MIDI Output Test",
-			"Message Log",
+			MenuItemPerformanceStatus,
+			MenuItemMIDIConfiguration,
+			MenuItemMIDIOutputTest,
+			MenuItemDebug,
 		}
 	}
 }
@@ -321,9 +379,9 @@ func (m model) conductorButtons() []string {
 	if m.role != "conductor" {
 		return []string{}
 	}
-	switch m.state.Phase.Type {
+	switch m.state.Phase {
 	case game.GamePhaseUninitialized:
-		return []string{"Advance"}
+		return []string{}
 	case game.GamePhaseLobby:
 		return []string{"Advance"}
 	case game.GamePhaseHero:
@@ -331,7 +389,7 @@ func (m model) conductorButtons() []string {
 	case game.GamePhaseProcessing:
 		return []string{}
 	case game.GamePhasePlayback:
-		return []string{}
+		return []string{"Advance"}
 	case game.GamePhaseDone:
 		return []string{"Restart"}
 	default:
@@ -359,6 +417,7 @@ func (m model) checkVersion() tea.Msg {
 	if resp.StatusCode >= 300 || resp.StatusCode < 200 {
 		return msgQuit(fmt.Errorf("error finding latest version: %s", resp.Status).Error())
 	}
+	defer resp.Body.Close()
 	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return msgQuit(fmt.Errorf("error finding latest version: %s", err).Error())
@@ -442,6 +501,36 @@ func (m model) playMIDI(bs []byte) tea.Msg {
 	return nil
 }
 
+func (m model) checkScheduledPerformances() tea.Msg {
+	if m.role != "conductor" {
+		return nil
+	}
+	resp, err := http.Get(m.baseURL.Rest(data.PathScheduledPerformances))
+	if err != nil {
+		return msgQuit(err.Error())
+	}
+	defer resp.Body.Close()
+	bs, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return msgQuit(err.Error())
+	}
+	ps := game.PerformancesFromBytes(bs)
+	return msgGotScheduledPerformances(ps)
+}
+
+func (m model) startPerformance() tea.Msg {
+	p := m.scheduledPerformances[m.scheduledPerformanceIndex]
+	url := m.baseURL.Rest(data.PathBeginPerformance, "id", p.Configuration.PerformanceID)
+	resp, err := http.Post(url, "", nil)
+	if err != nil {
+		return msgQuit(err.Error())
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return msgQuit(fmt.Sprintf("status code %d", resp.StatusCode))
+	}
+	return msgStartedPerformance(url)
+}
+
 func (m model) updateBinary() tea.Msg {
 	resp, err := http.Get(m.baseURL.Rest(data.PathLatestClientDownload))
 	if err != nil {
@@ -454,4 +543,18 @@ func (m model) updateBinary() tea.Msg {
 		}
 	}
 	return msgQuit("Update complete. Please run again.")
+}
+
+func increment(i, n int) int {
+	if i+1 >= n {
+		return 0
+	}
+	return i + 1
+}
+
+func decrement(i, n int) int {
+	if i-1 < 0 {
+		return n - 1
+	}
+	return i - 1
 }

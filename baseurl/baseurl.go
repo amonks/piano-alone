@@ -1,18 +1,27 @@
 package baseurl
 
 import (
-	"fmt"
 	"strings"
 )
 
 type BaseURL string
 
+var NoHost = BaseURL("")
+
 func (url BaseURL) Host() string {
 	return string(url)
 }
 
-func (url BaseURL) Rest(path string) string {
-	return url.Host() + pathName(path)
+func (url BaseURL) Rest(path string, substitutions ...string) string {
+	if len(substitutions)%2 != 0 {
+		panic("odd number of substitutions")
+	}
+	p := pathName(path)
+	for i := 0; i < len(substitutions); i += 2 {
+		k, v := substitutions[i], substitutions[i+1]
+		p = strings.Replace(p, "{"+k+"}", v, 1)
+	}
+	return url.Host() + p
 }
 
 func (url BaseURL) WS(path string) string {
@@ -23,7 +32,7 @@ func (url BaseURL) WS(path string) string {
 	case strings.HasPrefix(url.Host(), "http://"):
 		base = strings.Replace(url.Host(), "http://", "ws://", 1)
 	default:
-		panic(fmt.Errorf("invalid base url: %s", url))
+		panic("can't make ws url from hostless baseURL")
 	}
 	return base + pathName(path)
 }

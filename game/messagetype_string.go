@@ -9,30 +9,30 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[MessageTypeInvalid-0]
-	_ = x[MessageTypeExpireLobby-1]
-	_ = x[MessageTypeExpireHero-2]
-	_ = x[MessageTypeDisklavierConnected-3]
-	_ = x[MessageTypeDisklavierDisconnected-4]
-	_ = x[MessageTypeConductorConnected-5]
-	_ = x[MessageTypeConductorDisconnected-6]
-	_ = x[MessageTypeJoin-7]
-	_ = x[MessageTypeLeave-8]
-	_ = x[MessageTypeSubmitPartialTrack-9]
-	_ = x[MessageTypeInitialState-10]
+	_ = x[MessageTypeConfigurePerformance-1]
+	_ = x[MessageTypeDisklavierConnected-2]
+	_ = x[MessageTypeDisklavierDisconnected-3]
+	_ = x[MessageTypeConductorConnected-4]
+	_ = x[MessageTypeConductorDisconnected-5]
+	_ = x[MessageTypeJoin-6]
+	_ = x[MessageTypeLeave-7]
+	_ = x[MessageTypeSubmitPartialTrack-8]
+	_ = x[MessageTypeState-9]
+	_ = x[MessageTypeBeginPerformance-10]
 	_ = x[MessageTypeBroadcastConnectedPlayer-11]
 	_ = x[MessageTypeBroadcastDisconnectedPlayer-12]
 	_ = x[MessageTypeAssignment-13]
 	_ = x[MessageTypeBroadcastPhase-14]
 	_ = x[MessageTypeBroadcastSubmittedTrack-15]
-	_ = x[MessageTypeBroadcastCombinedTrack-16]
-	_ = x[MessageTypeBroadcastControllerModal-17]
+	_ = x[MessageTypeBroadcastControllerModal-16]
+	_ = x[MessageTypeSendRenditionToDisklavier-17]
 	_ = x[MessageTypeRestart-18]
 	_ = x[MessageTypeAdvancePhase-19]
 }
 
-const _MessageType_name = "MessageTypeInvalidMessageTypeExpireLobbyMessageTypeExpireHeroMessageTypeDisklavierConnectedMessageTypeDisklavierDisconnectedMessageTypeConductorConnectedMessageTypeConductorDisconnectedMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeInitialStateMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastSubmittedTrackMessageTypeBroadcastCombinedTrackMessageTypeBroadcastControllerModalMessageTypeRestartMessageTypeAdvancePhase"
+const _MessageType_name = "MessageTypeInvalidMessageTypeConfigurePerformanceMessageTypeDisklavierConnectedMessageTypeDisklavierDisconnectedMessageTypeConductorConnectedMessageTypeConductorDisconnectedMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeStateMessageTypeBeginPerformanceMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastSubmittedTrackMessageTypeBroadcastControllerModalMessageTypeSendRenditionToDisklavierMessageTypeRestartMessageTypeAdvancePhase"
 
-var _MessageType_index = [...]uint16{0, 18, 40, 61, 91, 124, 153, 185, 200, 216, 245, 268, 303, 341, 362, 387, 421, 454, 489, 507, 530}
+var _MessageType_index = [...]uint16{0, 18, 49, 79, 112, 141, 173, 188, 204, 233, 249, 276, 311, 349, 370, 395, 429, 464, 500, 518, 541}
 
 func (i MessageType) String() string {
 	if i >= MessageType(len(_MessageType_index)-1) {

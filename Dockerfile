@@ -16,4 +16,5 @@ FROM alpine
   WORKDIR /app
   COPY . .
   COPY --from=gobuild /app/serve /app/serve
+
   CMD ["./serve"]

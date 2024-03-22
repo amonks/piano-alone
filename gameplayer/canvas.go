@@ -15,7 +15,7 @@ func (c *GameClient) animate(sceneGraphFunc func() ([]canvas.SceneNode, bool)) <
 	renderFrame = js.FuncOf(func(_ js.Value, _ []js.Value) any {
 		sceneGraph, hasNext := sceneGraphFunc()
 		if !hasNext {
-			done <- struct{}{}
+			go func() { done <- struct{}{} }()
 			return nil
 		}
 		canvas.Draw(canv, sceneGraph)

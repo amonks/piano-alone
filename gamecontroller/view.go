@@ -161,14 +161,16 @@ func (m model) viewMenu() string {
 func (m model) viewContent() string {
 	var content string
 	switch m.menu()[m.menuSelectionIndex] {
-	case "Performance Status":
+	case MenuItemStartPerformance:
+		content = m.viewStartPerformance()
+	case MenuItemPerformanceStatus:
 		content = m.viewPerformanceStatus()
-	case "MIDI Configuration":
+	case MenuItemMIDIConfiguration:
 		content = m.viewMidiOutPorts()
-	case "MIDI Output Test":
+	case MenuItemMIDIOutputTest:
 		content = m.viewMidiOutputTest()
-	case "Message Log":
-		content = m.viewMessageLog()
+	case MenuItemDebug:
+		content = m.viewDebug()
 	default:
 		content = "?"
 	}
@@ -180,23 +182,30 @@ func (m model) viewContent() string {
 }
 
 func (m model) viewMidiOutPorts() string {
-	var midiOutPorts strings.Builder
-	if len(m.midiOutPorts) == 0 {
-		midiOutPorts.WriteString("none found")
-	} else {
-		for _, p := range m.midiOutPorts {
-			if m.midiOutPorts[m.midiOutPortIndex].String() == p.String() {
-				midiOutPorts.WriteString(zone.Mark(p.String(), "* "+p.String()) + "\n")
-			} else {
-				midiOutPorts.WriteString(zone.Mark(p.String(), "  "+p.String()) + "\n")
-			}
-		}
+	outPorts := make([]string, len(m.midiOutPorts))
+	for i, p := range m.midiOutPorts {
+		outPorts[i] = p.String()
 	}
 
 	return joinVertical(
 		boxHeaderStyle.Render("MIDI Out Ports"),
-		midiOutPorts.String(),
+		renderList(outPorts, m.midiOutPortIndex, "none found"),
 	)
+}
+
+func renderList(items []string, selectedIndex int, alt string) string {
+	if len(items) == 0 {
+		return alt
+	}
+	out := make([]string, len(items))
+	for i, label := range items {
+		indicator := "  "
+		if i == selectedIndex {
+			indicator = "• "
+		}
+		out[i] = indicator + label
+	}
+	return joinVertical(out...)
 }
 
 func renderButton(label string, isActive bool) string {
@@ -214,7 +223,7 @@ func (m model) viewMidiOutputTest() string {
 		selectedPortMessage = "MIDI Port: " + m.midiOutPorts[m.midiOutPortIndex].String()
 	}
 	return joinVertical(
-		boxHeaderStyle.Render("MIDI Output Test"),
+		boxHeaderStyle.Render(MenuItemMIDIOutputTest),
 		selectedPortMessage,
 		"",
 		renderButton("Test MIDI Output", m.contentInFocus && hasMidiOutPort),
@@ -226,21 +235,22 @@ func (m model) viewPerformanceStatus() string {
 		return "nil state"
 	}
 
-	switch m.state.Phase.Type {
+	switch m.state.Phase {
 	case game.GamePhaseUninitialized:
 		return joinVertical(
-			boxHeaderStyle.Render("Performance Status"),
+			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
 			"Waiting for server operator to start the performance.",
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
-			"",
+			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			"",
 			m.viewConnectionStatus(),
 			m.viewConductorButtons(),
 		)
+
 	case game.GamePhaseLobby:
 		return joinVertical(
-			boxHeaderStyle.Render("Performance Status"),
+			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
 			"Waiting for players to join.",
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
@@ -252,7 +262,7 @@ func (m model) viewPerformanceStatus() string {
 
 	case game.GamePhaseHero:
 		return joinVertical(
-			boxHeaderStyle.Render("Performance Status"),
+			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
 			"Players are playing.",
 			"",
@@ -264,7 +274,7 @@ func (m model) viewPerformanceStatus() string {
 
 	case game.GamePhaseProcessing:
 		return joinVertical(
-			boxHeaderStyle.Render("Performance Status"),
+			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
 			"Processing MIDI from players.",
 			"",
@@ -276,7 +286,7 @@ func (m model) viewPerformanceStatus() string {
 
 	case game.GamePhasePlayback:
 		return joinVertical(
-			boxHeaderStyle.Render("Performance Status"),
+			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
 			"Playing combined MIDI on disklavier.",
 			"",
@@ -288,7 +298,7 @@ func (m model) viewPerformanceStatus() string {
 
 	case game.GamePhaseDone:
 		return joinVertical(
-			boxHeaderStyle.Render("Performance Status"),
+			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
 			"The performance is over.",
 			"",
@@ -301,7 +311,7 @@ func (m model) viewPerformanceStatus() string {
 
 	default:
 		return joinVertical(
-			boxHeaderStyle.Render("Performance Status"),
+			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
 			"Unknown state. Something is wrong.",
 			"",
@@ -318,6 +328,32 @@ func (m model) viewConnectionStatus() string {
 		renderStatus("disklavier", m.state.DisklavierIsConnected),
 		renderStatus("conductor", m.state.ConductorIsConnected),
 	)
+}
+
+func (m model) viewStartPerformance() string {
+	if m.state == nil {
+		return ""
+	}
+	switch m.state.Phase {
+	case game.GamePhaseUninitialized, game.GamePhaseDone:
+		return joinVertical(
+			boxHeaderStyle.Render(MenuItemStartPerformance),
+			m.viewScheduledPerformances(),
+		)
+	default:
+		return joinVertical(
+			boxHeaderStyle.Render(MenuItemStartPerformance),
+			"Performance has started.",
+		)
+	}
+}
+
+func (m model) viewScheduledPerformances() string {
+	var ps []string
+	for _, p := range m.scheduledPerformances {
+		ps = append(ps, fmt.Sprintf("%s", p.Date))
+	}
+	return renderList(ps, m.scheduledPerformanceIndex, "none found")
 }
 
 func (m model) viewConductorButtons() string {
@@ -348,17 +384,6 @@ func (m model) viewSelectedMIDIOutPort() string {
 	return fmt.Sprintf("MIDI Port: %s", m.midiOutPorts[m.midiOutPortIndex].String())
 }
 
-func (m model) viewMessageLog() string {
-	msgs := make([]string, len(m.log)+1)
-	msgs[0] = boxHeaderStyle.Render("Message Log")
-	for i, m := range m.log {
-		msgs[i+1] = m.String()
-	}
-	return joinVertical(
-		msgs...,
-	)
-}
-
 func (m model) viewStatusbar() string {
 	if m.quitting != "" {
 		return msgStyle.Copy().Width(m.width).Render(
@@ -381,6 +406,19 @@ func (m model) viewStatusbar() string {
 			msgStyle.Copy().Width(m.width-lipgloss.Width(data.CurrentVersion)-2).Render(msg),
 		),
 	)
+}
+
+func (m model) viewDebug() string {
+	lines := []string{
+		boxHeaderStyle.Render("State"),
+		fmt.Sprintf("Configuration: %t", m.state.Configuration != nil),
+		fmt.Sprintf("Phase: %s", m.state.Phase.String()),
+		"",
+		boxHeaderStyle.Render("Log"),
+	}
+	lines = append(lines, m.debug...)
+	return joinVertical(lines...)
+
 }
 
 func joinVertical(items ...string) string {
