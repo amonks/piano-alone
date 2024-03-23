@@ -223,13 +223,21 @@ func (c *GameClient) handleMessage(m message) error {
 			})
 			time.Sleep(time.Second * 4)
 
-			overlay.Set("innerText", "Focus on these keys here.")
+			if len(c.state.Players[c.fingerprint].AssignedNotes) > 1 {
+				overlay.Set("innerText", "Focus on these keys here.")
+			} else {
+				overlay.Set("innerText", "Focus on this key here.")
+			}
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
-			overlay.Set("innerText", "Notes will fall down towards the keys.")
+			if len(c.state.Players[c.fingerprint].AssignedNotes) > 1 {
+				overlay.Set("innerText", "Notes will fall down towards the keys.")
+			} else {
+				overlay.Set("innerText", "Notes will fall down towards the key.")
+			}
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
 			hide(overlay, "0.5s")
