@@ -1,6 +1,8 @@
 package templates
 
 import (
+	"fmt"
+
 	"monks.co/piano-alone/baseurl"
 	"monks.co/piano-alone/game"
 )
@@ -53,7 +55,7 @@ templ Performances(ps []*game.Performance) {
 					if p.IsComplete {
 						<a href={ templ.SafeURL(p.MIDIFilePath(baseurl.NoHost)) }>
 							<em>{ p.Configuration.Title }.midi</em>
-						</a>
+						</a> ({ fmt.Sprintf("%d", p.PlayerCount) } pianists)
 					} else {
 						<em>{ p.Configuration.Title }</em>
 					}
