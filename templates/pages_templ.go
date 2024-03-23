@@ -356,7 +356,7 @@ func footer() templ.Component {
 			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<footer class=\"pt-6 pb-2 md:pb-12\"><div class=\"mx-auto px-2 max-w-2xl mono\">Source code: <a href=\"https://github.com/piano-alone\">https://github.com/amonks/piano-alone</a></div></footer>")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<footer class=\"pt-6 pb-2 md:pb-12\"><div class=\"mx-auto px-2 max-w-2xl mono\">Source code: <a href=\"https://github.com/amonks/piano-alone\">https://github.com/amonks/piano-alone</a></div></footer>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
