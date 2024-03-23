@@ -9,6 +9,9 @@ primary_region = "ord"
 [build]
   dockerfile = "Dockerfile"
 
+[[vm]]
+  size = "performance-2x"
+
 [[mounts]]
   source = "piano_alone_data"
   destination = "/data"
