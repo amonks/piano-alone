@@ -30,7 +30,7 @@
 [[task]]
   id = "build-css"
   type = "short"
-  cmd = "./node_modules/.bin/tailwindcss -i ./css/style.css -o ./templates/style.css"
+  cmd = "./node_modules/.bin/postcss -o templates/style.css css/style.css"
   watch = ["./css/**", "./templates/*.templ"]
 
 [[task]]
