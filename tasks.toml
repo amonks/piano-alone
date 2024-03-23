@@ -1,25 +1,46 @@
 [[task]]
-  id = "build"
-  type = "short"
-  dependencies = ["build-templates", "build-wasm", "generate", "generate-canvas-api-wrapper"]
-  cmd = "go build -o ./serve ./gameserver"
-
-[[task]]
-  id = "start"
-  type = "long"
-  cmd = "./serve"
-
-[[task]]
   id = "dev"
   type = "long"
-  dependencies = ["generate", "build-wasm", "build-templates", "build-css"]
+  dependencies = ["assemble-dependencies"]
   watch = ["**/*.go", "css/*.css"]
   cmd = "go run ./gameserver"
 
 [[task]]
+  id = "deploy"
+  type = "short"
+  cmd = "fly deploy --build-only"
+  dependencies = ["assemble-dependencies"]
+
+[[task]]
+  # used in dockerfile
+  # do not add dependencies:
+  # assumes pre-build has already run outside the dockerfile
+  id = "build"
+  type = "short"
+  cmd = "go build -o ./serve ./gameserver"
+
+[[task]]
+  id = "assemble-dependencies"
+  type = "short"
+  dependencies = [
+    "build-client",
+    "build-templates",
+    "build-wasm",
+    "generate",
+    "generate-canvas-api-wrapper",
+    "build-css",
+  ]
+
+[[task]]
   id = "test"
   type = "short"
-  dependencies = ["generate", "build-wasm"]
+  dependencies = [
+    "generate",
+    "build-wasm",
+    "build-templates",
+    "generate-canvas-api-wrapper",
+    "build-css",
+  ]
   cmd = """
     go test ./...
     go vet ./...
@@ -28,10 +49,16 @@
   """
 
 [[task]]
+  id = "npm-install"
+  type = "short"
+  cmd = "npm install"
+
+[[task]]
   id = "build-css"
   type = "short"
   cmd = "./node_modules/.bin/postcss -o templates/style.css css/style.css"
   watch = ["./css/**", "./templates/*.templ"]
+  dependencies = ["npm-install"]
 
 [[task]]
   id = "build-client"
@@ -86,6 +113,7 @@
   id = "build-templates"
   type = "short"
   watch = ["templates/*.templ"]
+  dependencies = ["generate"]
   cmd = "go run github.com/a-h/templ/cmd/templ generate"
 
 [[task]]

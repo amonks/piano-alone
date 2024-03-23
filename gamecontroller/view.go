@@ -351,7 +351,7 @@ func (m model) viewStartPerformance() string {
 func (m model) viewScheduledPerformances() string {
 	var ps []string
 	for _, p := range m.scheduledPerformances {
-		ps = append(ps, fmt.Sprintf("%s", p.Date))
+		ps = append(ps, p.Date.String())
 	}
 	return renderList(ps, m.scheduledPerformanceIndex, "none found")
 }

@@ -1,6 +1,6 @@
 FROM golang:alpine as gobuild
   RUN apk update
-  RUN apk add build-base gcc bash
+  RUN apk add build-base gcc bash npm nodejs
   RUN rm -rf /var/cache/apk/*
 
   RUN go install github.com/amonks/run/cmd/run@latest

@@ -1,3 +1,7 @@
 .git
 .envrc
 Certificates.p12
+node_modules
+macos-client-universal.zip
+serve
+performances.db

@@ -230,7 +230,6 @@ func (s *Handler) HandleScheduledPerformances(w http.ResponseWriter, req *http.R
 	}
 	bs := game.PerformancesToBytes(ps)
 	w.Write(bs)
-	return
 }
 
 func (s *Handler) HandleBeginPerformance(w http.ResponseWriter, req *http.Request) {
