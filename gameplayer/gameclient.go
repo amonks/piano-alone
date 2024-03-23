@@ -227,7 +227,7 @@ func (c *GameClient) handleMessage(m message) error {
 				} else {
 					canv.Call("removeEventListener", "click", handler)
 				}
-				if overlay.Get("style").Call("getPropertyValue", "opacity").String() == "100%" {
+				if overlay.Get("style").Call("getPropertyValue", "opacity").String() == "1" {
 					hide(overlay, "0.5s")
 					time.Sleep(time.Second)
 				}
