@@ -70,10 +70,17 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 
 	c.piano = NewPiano(doc.Call("getElementById", "piano"), c.loopback)
 
+	noteCapacity := 1
+	if usesTouch {
+		noteCapacity = 3
+	}
 	send <- game.NewMessage(
 		game.MessageTypeJoin,
 		c.fingerprint,
-		[]byte(c.fingerprint),
+		game.JoinMessage{
+			Fingerprint:  c.fingerprint,
+			NoteCapacity: noteCapacity,
+		}.Bytes(),
 	)
 	for {
 		var m message
@@ -178,7 +185,7 @@ func (c *GameClient) handleMessage(m message) error {
 		}()
 
 	case msgStartHeroIntro:
-		keys := c.state.Players[c.fingerprint].Notes
+		keys := c.state.Players[c.fingerprint].AssignedNotes
 		go func() {
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
@@ -373,14 +380,14 @@ func (c *GameClient) handleMessage(m message) error {
 
 		case game.MessageTypeAssignment:
 			me := c.state.Players[c.fingerprint]
-			me.Notes = m.Data
+			me.AssignedNotes = m.Data
 			r := bytes.NewReader(c.state.Configuration.Score)
 			smf, err := smf.ReadFrom(r)
 			if err != nil {
 				return err
 			}
-			c.myScore = NewScore(abstrack.FromSMF(smf, 0).Select(me.Notes))
-			c.tutorialScore = BuildTutorialScore(me.Notes)
+			c.myScore = NewScore(abstrack.FromSMF(smf, 0).Select(me.AssignedNotes))
+			c.tutorialScore = BuildTutorialScore(me.AssignedNotes)
 			if c.pianoAnimationReady {
 				go func() { c.loopback <- msgShowClickthrough{} }()
 			}

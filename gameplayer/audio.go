@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"sync"
 	"syscall/js"
 
@@ -41,7 +40,6 @@ func (a *Audio) NoteOn(note uint8) {
 
 	osc := a.oscillators[note]
 	if !osc.isConnected {
-		log.Printf("connect %d", note)
 		osc.isConnected = true
 		osc.handle.Call("connect", a.context.Get("destination"))
 	}
@@ -56,7 +54,6 @@ func (a *Audio) NoteOff(note uint8) {
 		return
 	}
 
-	log.Printf("disconnect %d", note)
 	osc.isConnected = false
 	osc.handle.Call("disconnect", a.context.Get("destination"))
 }

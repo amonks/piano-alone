@@ -6,11 +6,13 @@ import (
 )
 
 type Player struct {
-	ConnectionState ConnectionState
-	Fingerprint     string
-	Pianist         string
-	Notes           []uint8
-	HasSubmitted    bool
+	ConnectionState      ConnectionState
+	Fingerprint          string
+	NoteCapacity         int
+	AssignedNotes        []uint8
+	HasStartedTutorial   bool
+	HasCompletedTutorial bool
+	HasSubmitted         bool
 }
 
 func PlayerFromBytes(bs []byte) *Player {

@@ -138,7 +138,6 @@ func (p *Piano) Morph(dur time.Duration, f func(bool, uint8)) {
 				keyWidth    = screenWidth / keyCount
 				touched     = map[uint8]struct{}{}
 			)
-			log.Println(evType)
 			ev.Call("preventDefault")
 			switch evType {
 			case "mouseup":

@@ -1,7 +1,13 @@
 [[task]]
   id = "dev"
   type = "long"
-  dependencies = ["assemble-dependencies"]
+  dependencies = [
+    "build-css",
+    "build-templates",
+    "build-wasm",
+    "generate",
+    "generate-canvas-api-wrapper",
+  ]
   watch = ["**/*.go", "css/*.css"]
   cmd = "go run ./gameserver"
 

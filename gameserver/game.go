@@ -10,11 +10,6 @@ import (
 	"monks.co/piano-alone/abstrack"
 	"monks.co/piano-alone/db"
 	"monks.co/piano-alone/game"
-	"monks.co/piano-alone/pianists"
-)
-
-const (
-	maxNotesPerPlayer = 3
 )
 
 type GameServer struct {
@@ -110,15 +105,14 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			track := abstrack.FromSMF(f, 0)
 			notes := track.CountNotes()
 			for i, note := range notes {
-				player := fingerprints[i%len(fingerprints)]
-				if len(gs.state.Players[player].Notes) >= maxNotesPerPlayer {
-					log.Printf("completed assignment with %d unassigned notes", len(notes)-i)
-					break
+				fingerprint := fingerprints[i%len(fingerprints)]
+				player := gs.state.Players[fingerprint]
+				if len(player.AssignedNotes) < player.NoteCapacity {
+					player.AssignedNotes = append(player.AssignedNotes, note.Key)
 				}
-				gs.state.Players[player].Notes = append(gs.state.Players[player].Notes, note.Key)
 			}
 			for _, player := range gs.state.Players {
-				gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, player.Notes)
+				gs.sendTo(player.Fingerprint, game.MessageTypeAssignment, player.AssignedNotes)
 			}
 			gs.setPhase(game.GamePhaseHero)
 			return nil
@@ -178,18 +172,20 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		return nil
 
 	case game.MessageTypeJoin:
-		if _, got := gs.state.Players[msg.Player]; !got {
-			gs.state.Players[msg.Player] = &game.Player{
+		joinMessage := game.JoinMessageFromBytes(msg.Data)
+		fingerprint, noteCapacity := joinMessage.Fingerprint, joinMessage.NoteCapacity
+		if _, got := gs.state.Players[fingerprint]; !got {
+			gs.state.Players[fingerprint] = &game.Player{
 				ConnectionState: game.ConnectionStateConnected,
 				Fingerprint:     msg.Player,
-				Pianist:         pianists.Hash(msg.Player),
+				NoteCapacity:    noteCapacity,
 			}
 		}
-		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateConnected
+		gs.state.Players[fingerprint].ConnectionState = game.ConnectionStateConnected
 		gs.sendTo(msg.Player, game.MessageTypeState, gs.state.Bytes())
-		gs.broadcast(game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[msg.Player].Bytes())
-		if notes := gs.state.Players[msg.Player].Notes; len(notes) > 0 {
-			gs.sendTo(msg.Player, game.MessageTypeAssignment, notes)
+		gs.broadcast(game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[fingerprint].Bytes())
+		if notes := gs.state.Players[fingerprint].AssignedNotes; len(notes) > 0 {
+			gs.sendTo(fingerprint, game.MessageTypeAssignment, notes)
 		}
 		return nil
 
