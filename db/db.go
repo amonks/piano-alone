@@ -35,7 +35,7 @@ func OpenDB(path string) (*DB, error) {
 		if err := db.Create(&game.Performance{
 			Configuration: &game.Configuration{
 				PerformanceID: id.Random128(),
-				Score:         songs.ExcerptBytes,
+				Score:         songs.PreludeOpus3No2Bytes,
 				Title:         "Prelude in C♯ Minor",
 				Composer:      "Sergei Rachmaninoff",
 			},
