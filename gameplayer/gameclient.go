@@ -325,7 +325,7 @@ func (c *GameClient) handleMessage(m message) error {
 		if err != nil {
 			panic(err)
 		}
-		c.send <- game.NewMessage(game.MessageTypeSubmitPartialTrack, "", bs)
+		c.send <- game.NewMessage(game.MessageTypeSubmitPartialTrack, c.fingerprint, bs)
 		go func() { c.loopback <- msgLookAtDisklavier{} }()
 
 	case msgLookAtDisklavier:
