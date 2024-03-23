@@ -14,7 +14,7 @@
 [[task]]
   id = "deploy"
   type = "short"
-  cmd = "fly deploy --build-only"
+  cmd = "fly deploy"
   dependencies = ["assemble-dependencies"]
 
 [[task]]
