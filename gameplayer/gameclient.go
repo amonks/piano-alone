@@ -349,7 +349,7 @@ func (c *GameClient) handleMessage(m message) error {
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
-			overlay.Set("innerHTML", "Our score is Rachmaninoff’s <em>Prelude in C♯ Minor</em>.")
+			overlay.Set("innerHTML", "<span>Our score is Rachmaninoff’s <em>Prelude in C♯ Minor</em>.</span>")
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
 			hide(overlay, "0.5s")
