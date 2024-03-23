@@ -135,13 +135,25 @@ func (s *Handler) withConn(fingerprint string, f func(*websocket.Conn)) {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
 	switch fingerprint {
+	case "controllers":
+		if s.disklavierConn != nil {
+			f(s.disklavierConn)
+		}
+		if s.conductorConn != nil {
+			f(s.conductorConn)
+		}
 	case "disklavier":
-		f(s.disklavierConn)
+		if s.disklavierConn != nil {
+			f(s.disklavierConn)
+		}
 	case "conductor":
-		f(s.conductorConn)
+		if s.conductorConn != nil {
+			f(s.conductorConn)
+		}
 	default:
-		fmt.Println("f:", fingerprint)
-		f(s.conns[fingerprint])
+		if c, ok := s.conns[fingerprint]; ok {
+			f(c)
+		}
 	}
 }
 func (s *Handler) eachConn(f func(string, *websocket.Conn)) {

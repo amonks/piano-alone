@@ -34,7 +34,7 @@ func App(perfs []*game.Performance) templ.Component {
 				templ_7745c5c3_Buffer = templ.GetBuffer()
 				defer templ.ReleaseBuffer(templ_7745c5c3_Buffer)
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div id=\"app\"><canvas></canvas><div id=\"overlay\" class=\"copy text-xl opacity-0 flex items-center justify-center absolute inset-0\">The performance hasn’t started yet.</div><div id=\"piano\" class=\"opacity-0\"></div></div>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<div id=\"app\"><canvas></canvas><div id=\"overlay\" class=\"copy text-xl opacity-0 flex items-center justify-center absolute inset-0\"></div><div id=\"piano\" class=\"opacity-0\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -50,7 +50,7 @@ func App(perfs []*game.Performance) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" <div id=\"page\">")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" <div id=\"page\"><div class=\"fixed w-full h-full pointer-events-none flex items-center justify-center\"><div id=\"alert\" class=\"opacity-0 transition-opacity m-auto p-8 text-center mono bg-orange-300 min-w-40 fixed z-10 border-2 border-black\">hello</div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -234,7 +234,7 @@ func Performances(ps []*game.Performance) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(p.Date.Format("Monday, Jan 02 2006 15:04"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 50, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 51, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -247,7 +247,7 @@ func Performances(ps []*game.Performance) templ.Component {
 			var templ_7745c5c3_Var12 string
 			templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(p.Configuration.Composer)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 51, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 52, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 			if templ_7745c5c3_Err != nil {
@@ -274,7 +274,7 @@ func Performances(ps []*game.Performance) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(p.Configuration.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 54, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 55, Col: 34}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -292,7 +292,7 @@ func Performances(ps []*game.Performance) templ.Component {
 				var templ_7745c5c3_Var15 string
 				templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(p.Configuration.Title)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 57, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 58, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 				if templ_7745c5c3_Err != nil {
@@ -427,7 +427,7 @@ func page(title string) templ.Component {
 		var templ_7745c5c3_Var20 string
 		templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 99, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/pages.templ`, Line: 100, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 		if templ_7745c5c3_Err != nil {

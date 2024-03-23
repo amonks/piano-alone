@@ -240,8 +240,10 @@ func (m model) viewPerformanceStatus() string {
 		return joinVertical(
 			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
+			"",
 			"Waiting for server operator to start the performance.",
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
+			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			"",
 			m.viewConnectionStatus(),
@@ -252,8 +254,10 @@ func (m model) viewPerformanceStatus() string {
 		return joinVertical(
 			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
+			"",
 			"Waiting for players to join.",
 			fmt.Sprintf("Please direct attendees to %s", m.baseURL.Rest("/")),
+			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			"",
 			m.viewConnectionStatus(),
@@ -264,10 +268,14 @@ func (m model) viewPerformanceStatus() string {
 		return joinVertical(
 			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
+			"",
 			"Players are playing.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
+			fmt.Sprintf("Started Tutorials: %d", m.state.CountStartedTutorials()),
+			fmt.Sprintf("Completed Tutorials: %d", m.state.CountCompletedTutorials()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			"",
 			m.viewConnectionStatus(),
 			m.viewConductorButtons(),
 		)
@@ -276,10 +284,12 @@ func (m model) viewPerformanceStatus() string {
 		return joinVertical(
 			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
+			"",
 			"Processing MIDI from players.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			"",
 			m.viewConnectionStatus(),
 			m.viewConductorButtons(),
 		)
@@ -288,10 +298,12 @@ func (m model) viewPerformanceStatus() string {
 		return joinVertical(
 			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
+			"",
 			"Playing combined MIDI on disklavier.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			"",
 			m.viewConnectionStatus(),
 			m.viewConductorButtons(),
 		)
@@ -300,6 +312,7 @@ func (m model) viewPerformanceStatus() string {
 		return joinVertical(
 			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
+			"",
 			"The performance is over.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
@@ -313,10 +326,12 @@ func (m model) viewPerformanceStatus() string {
 		return joinVertical(
 			boxHeaderStyle.Render(MenuItemPerformanceStatus),
 			m.viewSelectedMIDIOutPort(),
+			"",
 			"Unknown state. Something is wrong.",
 			"",
 			fmt.Sprintf("Connected players: %d", m.state.CountConnectedPlayers()),
 			fmt.Sprintf("Submitted tracks: %d", m.state.CountSubmittedTracks()),
+			"",
 			m.viewConnectionStatus(),
 			m.viewConductorButtons(),
 		)

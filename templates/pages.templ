@@ -9,14 +9,15 @@ templ App(perfs []*game.Performance ) {
 	@page("life online") {
 		<div id="app">
 			<canvas></canvas>
-			<div id="overlay" class="copy text-xl opacity-0 flex items-center justify-center absolute inset-0">
-				The performance hasn’t started yet.
-			</div>
+			<div id="overlay" class="copy text-xl opacity-0 flex items-center justify-center absolute inset-0"></div>
 			<div id="piano" class="opacity-0"></div>
 		</div>
 		@script("wasm_exec.js")
 		@script("wasm.js")
 		<div id="page">
+			<div class="fixed w-full h-full pointer-events-none flex items-center justify-center">
+				<div id="alert" class="opacity-0 transition-opacity m-auto p-8 text-center mono bg-orange-300 min-w-40 fixed z-10 border-2 border-black">hello</div>
+			</div>
 			@container() {
 				@Performances(perfs)
 				@markdown("copy.md")

@@ -165,12 +165,16 @@ func (p *Piano) Morph(dur time.Duration, f func(bool, uint8)) {
 				if k.isOn && !isTouched {
 					k.el.Get("style").Call("setProperty", "background-color", "white")
 					k.isOn = false
-					p.audio.NoteOff(k.noteno)
+					if p.audio != nil {
+						p.audio.NoteOff(k.noteno)
+					}
 					f(false, k.noteno)
 				} else if !k.isOn && isTouched {
 					k.el.Get("style").Call("setProperty", "background-color", "#dddddd")
 					k.isOn = true
-					p.audio.NoteOn(k.noteno)
+					if p.audio != nil {
+						p.audio.NoteOn(k.noteno)
+					}
 					f(true, k.noteno)
 				}
 			}

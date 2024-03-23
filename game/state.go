@@ -39,6 +39,26 @@ func (s *State) CountConnectedPlayers() int {
 	return n
 }
 
+func (s *State) CountStartedTutorials() int {
+	n := 0
+	for _, p := range s.Players {
+		if p.HasStartedTutorial {
+			n++
+		}
+	}
+	return n
+}
+
+func (s *State) CountCompletedTutorials() int {
+	n := 0
+	for _, p := range s.Players {
+		if p.HasCompletedTutorial {
+			n++
+		}
+	}
+	return n
+}
+
 func (s *State) CountSubmittedTracks() int {
 	n := 0
 	for _, p := range s.Players {
@@ -67,4 +87,3 @@ func (s *State) Bytes() []byte {
 	}
 	return buf.Bytes()
 }
-

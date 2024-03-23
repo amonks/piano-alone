@@ -17,22 +17,24 @@ func _() {
 	_ = x[MessageTypeJoin-6]
 	_ = x[MessageTypeLeave-7]
 	_ = x[MessageTypeSubmitPartialTrack-8]
-	_ = x[MessageTypeState-9]
-	_ = x[MessageTypeBeginPerformance-10]
-	_ = x[MessageTypeBroadcastConnectedPlayer-11]
-	_ = x[MessageTypeBroadcastDisconnectedPlayer-12]
-	_ = x[MessageTypeAssignment-13]
-	_ = x[MessageTypeBroadcastPhase-14]
-	_ = x[MessageTypeBroadcastSubmittedTrack-15]
-	_ = x[MessageTypeBroadcastControllerModal-16]
-	_ = x[MessageTypeSendRenditionToDisklavier-17]
-	_ = x[MessageTypeRestart-18]
-	_ = x[MessageTypeAdvancePhase-19]
+	_ = x[MessageTypeStartTutorial-9]
+	_ = x[MessageTypeCompleteTutorial-10]
+	_ = x[MessageTypeState-11]
+	_ = x[MessageTypeBeginPerformance-12]
+	_ = x[MessageTypeBroadcastConnectedPlayer-13]
+	_ = x[MessageTypeBroadcastDisconnectedPlayer-14]
+	_ = x[MessageTypeAssignment-15]
+	_ = x[MessageTypeBroadcastPhase-16]
+	_ = x[MessageTypeBroadcastSubmittedTrack-17]
+	_ = x[MessageTypeBroadcastControllerModal-18]
+	_ = x[MessageTypeSendRenditionToDisklavier-19]
+	_ = x[MessageTypeRestart-20]
+	_ = x[MessageTypeAdvancePhase-21]
 }
 
-const _MessageType_name = "MessageTypeInvalidMessageTypeConfigurePerformanceMessageTypeDisklavierConnectedMessageTypeDisklavierDisconnectedMessageTypeConductorConnectedMessageTypeConductorDisconnectedMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeStateMessageTypeBeginPerformanceMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastSubmittedTrackMessageTypeBroadcastControllerModalMessageTypeSendRenditionToDisklavierMessageTypeRestartMessageTypeAdvancePhase"
+const _MessageType_name = "MessageTypeInvalidMessageTypeConfigurePerformanceMessageTypeDisklavierConnectedMessageTypeDisklavierDisconnectedMessageTypeConductorConnectedMessageTypeConductorDisconnectedMessageTypeJoinMessageTypeLeaveMessageTypeSubmitPartialTrackMessageTypeStartTutorialMessageTypeCompleteTutorialMessageTypeStateMessageTypeBeginPerformanceMessageTypeBroadcastConnectedPlayerMessageTypeBroadcastDisconnectedPlayerMessageTypeAssignmentMessageTypeBroadcastPhaseMessageTypeBroadcastSubmittedTrackMessageTypeBroadcastControllerModalMessageTypeSendRenditionToDisklavierMessageTypeRestartMessageTypeAdvancePhase"
 
-var _MessageType_index = [...]uint16{0, 18, 49, 79, 112, 141, 173, 188, 204, 233, 249, 276, 311, 349, 370, 395, 429, 464, 500, 518, 541}
+var _MessageType_index = [...]uint16{0, 18, 49, 79, 112, 141, 173, 188, 204, 233, 257, 284, 300, 327, 362, 400, 421, 446, 480, 515, 551, 569, 592}
 
 func (i MessageType) String() string {
 	if i >= MessageType(len(_MessageType_index)-1) {

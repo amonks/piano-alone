@@ -3,7 +3,7 @@ package data
 import "time"
 
 const (
-	CurrentVersion = "3.0.1"
+	CurrentVersion = "3.1.0"
 )
 
 var (

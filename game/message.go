@@ -32,6 +32,8 @@ const (
 	MessageTypeJoin
 	MessageTypeLeave
 	MessageTypeSubmitPartialTrack
+	MessageTypeStartTutorial
+	MessageTypeCompleteTutorial
 
 	MessageTypeState
 	MessageTypeBeginPerformance

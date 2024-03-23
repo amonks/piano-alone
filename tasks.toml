@@ -126,6 +126,7 @@
   id = "generate"
   type = "short"
   cmd = "go generate ./..."
+  # can't have *.go as a "watch" here, because generate touches *.go files.
 
 [[task]]
   id = "generate-canvas-api-wrapper"

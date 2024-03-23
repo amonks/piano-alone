@@ -86,7 +86,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case msgGotScheduledPerformances:
 		m.debug = append(m.debug, fmt.Sprintf("msgGotScheduledPerformances: %d performances", len(msg)))
 	case msgStartedPerformance:
-		m.debug = append(m.debug, fmt.Sprintf("msgStartedPerformance: %s", string(msg)))
+		m.debug = append(m.debug, "msgStartedPerformance")
 	default:
 		m.debug = append(m.debug, fmt.Sprintf("%+v", msg))
 	}
@@ -130,9 +130,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			player := game.PlayerFromBytes(msg.Data)
 			m.state.Players[player.Fingerprint] = player
 			return m, m.acceptMessage
-
 		case game.MessageTypeBroadcastDisconnectedPlayer:
 			m.state.Players[string(msg.Data)].ConnectionState = game.ConnectionStateDisconnected
+			return m, m.acceptMessage
+
+		case game.MessageTypeStartTutorial:
+			m.state.Players[string(msg.Data)].HasStartedTutorial = true
+			return m, m.acceptMessage
+		case game.MessageTypeCompleteTutorial:
+			m.state.Players[string(msg.Data)].HasStartedTutorial = true
+			m.state.Players[string(msg.Data)].HasCompletedTutorial = true
 			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastControllerModal:

@@ -31,6 +31,7 @@ var (
 	html = doc.Call("querySelector", "html")
 
 	page         = doc.Call("getElementById", "page")
+	alert        = doc.Call("getElementById", "alert")
 	performances = doc.Call("getElementById", "performances")
 
 	app     = doc.Call("getElementById", "app")
@@ -57,7 +58,6 @@ type GameClient struct {
 
 func New(fingerprint string, root js.Value) *GameClient {
 	return &GameClient{
-		state:       game.NewState(),
 		fingerprint: fingerprint,
 	}
 }
@@ -104,7 +104,11 @@ func (c *GameClient) Start(send chan<- *game.Message, recv <-chan *game.Message)
 type message interface{}
 
 type (
-	msgInit                struct{}
+	msgError string
+
+	msgShowLobby           struct{}
+	msgStartFromTutorial   struct{}
+	msgResume              struct{}
 	msgPianoAnimationReady struct{}
 	msgShowClickthrough    struct{}
 	msgStartHeroIntro      struct{}
@@ -115,7 +119,7 @@ type (
 	msgKey                 = recorder.Event
 )
 
-func (msgInit) String() string                { return "msgInit" }
+func (msgShowLobby) String() string           { return "msgInit" }
 func (msgPianoAnimationReady) String() string { return "msgPianoAnimationReady" }
 func (msgStartHeroIntro) String() string      { return "msgStartHeroIntro" }
 func (msgStartRecording) String() string      { return "msgStartRecording" }
@@ -124,42 +128,96 @@ func (msgHeroDone) String() string            { return "msgHeroDone" }
 func show(el js.Value, duration string) {
 	style := el.Get("style")
 	style.Call("setProperty", "transition-duration", duration)
+	time.Sleep(time.Millisecond)
 	style.Call("setProperty", "opacity", "100%")
 }
 func hide(el js.Value, duration string) {
 	style := el.Get("style")
 	style.Call("setProperty", "transition-duration", duration)
+	time.Sleep(time.Millisecond)
 	style.Call("setProperty", "opacity", "0%")
 }
 
 func (c *GameClient) handleMessage(m message) error {
 	switch m := m.(type) {
 
-	case msgInit:
+	case msgError:
+		go func() {
+			alert.Set("innerText", string(m))
+			show(alert, "1s")
+			time.Sleep(time.Second * 6)
+			hide(alert, "1s")
+		}()
+		return nil
+
+	case msgShowLobby:
 		go func() {
 			hide(page, "1s")
 			time.Sleep(time.Second)
 			html.Get("classList").Call("add", "app")
 
-			show(overlay, "1s")
-			time.Sleep(time.Second / 2)
+			overlay.Set("innerText", "Waiting for other players to join.")
+			show(overlay, "0.5s")
 			show(doc.Call("getElementById", "piano"), "1s")
 			time.Sleep(time.Second * 2)
 
 			c.loopback <- msgPianoAnimationReady{}
 		}()
+		return nil
+
+	case msgStartFromTutorial:
+		go func() {
+			hide(page, "1s")
+			time.Sleep(time.Second)
+			html.Get("classList").Call("add", "app")
+
+			show(doc.Call("getElementById", "piano"), "1s")
+			time.Sleep(time.Second * 2)
+
+			c.loopback <- msgShowClickthrough{}
+		}()
+		return nil
+
+	case msgResume:
+		go func() {
+			hide(page, "1s")
+			time.Sleep(time.Second)
+			html.Get("classList").Call("add", "app")
+
+			show(doc.Call("getElementById", "piano"), "1s")
+			time.Sleep(time.Second * 2)
+
+			hide(overlay, "1s")
+
+			c.piano.HideInactiveKeys(c.state.Players[c.fingerprint].AssignedNotes, time.Second*2)
+			time.Sleep(time.Second * 3)
+			c.piano.Morph(time.Second, func(on bool, noteno uint8) {
+				now := time.Now()
+				var msg midi.Message
+				if on {
+					msg = midi.NoteOn(1, noteno, 100)
+				} else {
+					msg = midi.NoteOff(1, noteno)
+				}
+				c.loopback <- msgKey{Timestamp: now, Message: msg}
+			})
+			time.Sleep(time.Second * 2)
+
+			c.loopback <- msgPianoAnimationReady{}
+		}()
+		return nil
 
 	case msgPianoAnimationReady:
 		c.pianoAnimationReady = true
+
 		if c.myScore != nil {
 			go func() { c.loopback <- msgShowClickthrough{} }()
 		}
+		return nil
 
 	case msgShowClickthrough:
+		hasCompletedTutorial := c.state.Players[c.fingerprint].HasCompletedTutorial
 		go func() {
-			hide(overlay, "0.5s")
-			time.Sleep(time.Second)
-
 			var handler js.Func
 			handler = js.FuncOf(func(_ js.Value, args []js.Value) any {
 				args[0].Call("preventDefault")
@@ -169,24 +227,34 @@ func (c *GameClient) handleMessage(m message) error {
 				} else {
 					canv.Call("removeEventListener", "click", handler)
 				}
-				c.loopback <- msgStartHeroIntro{}
+				if overlay.Get("style").Call("getPropertyValue", "opacity").String() == "100%" {
+					hide(overlay, "0.5s")
+					time.Sleep(time.Second)
+				}
+				if hasCompletedTutorial {
+					c.loopback <- msgStartRecording{}
+				} else {
+					c.loopback <- msgStartHeroIntro{}
+				}
 				return nil
 			})
 			if usesTouch {
 				canv.Call("addEventListener", "touchend", handler)
-				overlay.Set("innerText", "Tap the screen to begin.")
+				overlay.Set("innerText", "Tap here to begin.")
 			} else {
 				canv.Call("addEventListener", "click", handler)
-				overlay.Set("innerText", "Click anywhere to begin.")
+				overlay.Set("innerText", "Click here to begin.")
 			}
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
-
 		}()
+		return nil
 
 	case msgStartHeroIntro:
 		keys := c.state.Players[c.fingerprint].AssignedNotes
 		go func() {
+			c.send <- game.NewMessage(game.MessageTypeStartTutorial, c.fingerprint, nil)
+
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
@@ -305,9 +373,10 @@ func (c *GameClient) handleMessage(m message) error {
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
+			c.send <- game.NewMessage(game.MessageTypeCompleteTutorial, c.fingerprint, nil)
 			c.loopback <- msgStartRecording{}
-
 		}()
+		return nil
 
 	case msgStartRecording:
 		c.recorder = recorder.New(120)
@@ -318,6 +387,7 @@ func (c *GameClient) handleMessage(m message) error {
 			time.Sleep(c.myScore.NoteTracks[0].Track.Dur() + screenDuration + time.Second)
 			c.loopback <- msgHeroDone{}
 		}()
+		return nil
 
 	case msgHeroDone:
 		c.recorder.Close()
@@ -327,11 +397,13 @@ func (c *GameClient) handleMessage(m message) error {
 		}
 		c.send <- game.NewMessage(game.MessageTypeSubmitPartialTrack, c.fingerprint, bs)
 		go func() { c.loopback <- msgLookAtDisklavier{} }()
+		return nil
 
 	case msgLookAtDisklavier:
 		overlay.Set("innerHTML", "Done!<br />When everyone else is finished, we’ll hear our performance on the disklavier.")
 		show(overlay, "0.5s")
 		time.Sleep(time.Second * 2)
+		return nil
 
 	case msgPerformanceIsOver:
 		go func() {
@@ -348,28 +420,60 @@ func (c *GameClient) handleMessage(m message) error {
 			html.Get("classList").Call("remove", "app")
 			show(page, "1s")
 		}()
+		return nil
 
 	case msgKey:
 		if c.recorder != nil {
 			c.recorder.Record(m)
 		}
+		return nil
 
 	case *game.Message:
 		switch m.Type {
 
 		case game.MessageTypeState:
+			isInit := c.state == nil
 			c.state = game.StateFromBytes(m.Data)
-			if c.state.Phase != game.GamePhaseUninitialized &&
-				c.state.Phase != game.GamePhaseDone {
-				go func() { c.loopback <- msgInit{} }()
+			if !isInit {
+				return nil
 			}
+			me := c.state.Players[c.fingerprint]
+			hasAssignment := len(me.AssignedNotes) > 0
+
+			switch c.state.Phase {
+
+			case game.GamePhaseUninitialized:
+
+			case game.GamePhaseLobby:
+				go func() { c.loopback <- msgShowLobby{} }()
+			case game.GamePhaseHero:
+				if hasAssignment {
+					if err := c.setUpScore(m.Data); err != nil {
+						return err
+					}
+					if me.HasCompletedTutorial {
+						go func() { c.loopback <- msgResume{} }()
+					} else {
+						go func() { c.loopback <- msgStartFromTutorial{} }()
+					}
+
+				} else {
+					go func() { c.loopback <- msgError("Unfortunately, the performance has already started.") }()
+				}
+			case game.GamePhaseProcessing:
+				fallthrough
+			case game.GamePhasePlayback:
+				go func() { c.loopback <- msgError("Turn your attention to the video stream.") }()
+			case game.GamePhaseDone:
+			}
+			return nil
 
 		case game.MessageTypeBroadcastPhase:
 			before := c.state.Phase
 			after := game.PhaseFromBytes(m.Data)
 			c.state.Phase = after
-			if before == game.GamePhaseUninitialized && after != game.GamePhaseUninitialized {
-				go func() { c.loopback <- msgInit{} }()
+			if before == game.GamePhaseUninitialized && after == game.GamePhaseLobby {
+				go func() { c.loopback <- msgShowLobby{} }()
 			} else {
 				switch after {
 				case game.GamePhaseProcessing:
@@ -378,27 +482,25 @@ func (c *GameClient) handleMessage(m message) error {
 					go func() { c.loopback <- msgPerformanceIsOver{} }()
 				}
 			}
+			return nil
 
 		case game.MessageTypeBroadcastConnectedPlayer:
 			player := game.PlayerFromBytes(m.Data)
 			c.state.Players[player.Fingerprint] = player
+			return nil
 
 		case game.MessageTypeBroadcastDisconnectedPlayer:
 			c.state.Players[string(m.Data)].ConnectionState = game.ConnectionStateDisconnected
+			return nil
 
 		case game.MessageTypeAssignment:
-			me := c.state.Players[c.fingerprint]
-			me.AssignedNotes = m.Data
-			r := bytes.NewReader(c.state.Configuration.Score)
-			smf, err := smf.ReadFrom(r)
-			if err != nil {
+			if err := c.setUpScore(m.Data); err != nil {
 				return err
 			}
-			c.myScore = NewScore(abstrack.FromSMF(smf, 0).Select(me.AssignedNotes))
-			c.tutorialScore = BuildTutorialScore(me.AssignedNotes)
 			if c.pianoAnimationReady {
 				go func() { c.loopback <- msgShowClickthrough{} }()
 			}
+			return nil
 
 		case game.MessageTypeBroadcastSubmittedTrack:
 			fingerprint := string(m.Data)
@@ -406,10 +508,25 @@ func (c *GameClient) handleMessage(m message) error {
 				c.state.Players[fingerprint] = &game.Player{}
 			}
 			c.state.Players[fingerprint].HasSubmitted = true
+			return nil
 
 		default:
 			log.Printf("not handling message (type: '%s')", m.Type.String())
+			return nil
 		}
 	}
+	return nil
+}
+
+func (c *GameClient) setUpScore(notes []uint8) error {
+	me := c.state.Players[c.fingerprint]
+	me.AssignedNotes = notes
+	r := bytes.NewReader(c.state.Configuration.Score)
+	smf, err := smf.ReadFrom(r)
+	if err != nil {
+		return err
+	}
+	c.myScore = NewScore(abstrack.FromSMF(smf, 0).Select(me.AssignedNotes))
+	c.tutorialScore = BuildTutorialScore(me.AssignedNotes)
 	return nil
 }

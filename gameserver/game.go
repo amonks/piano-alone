@@ -152,23 +152,23 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 	case game.MessageTypeConductorConnected:
 		gs.state.ConductorIsConnected = true
 		gs.sendTo(msg.Player, game.MessageTypeState, gs.state.Bytes())
-		gs.broadcast(game.MessageTypeConductorConnected, nil)
+		gs.sendTo("controllers", game.MessageTypeConductorConnected, nil)
 		return nil
 
 	case game.MessageTypeDisklavierConnected:
 		gs.state.DisklavierIsConnected = true
 		gs.sendTo(msg.Player, game.MessageTypeState, gs.state.Bytes())
-		gs.broadcast(game.MessageTypeDisklavierConnected, nil)
+		gs.sendTo("controllers", game.MessageTypeDisklavierConnected, nil)
 		return nil
 
 	case game.MessageTypeConductorDisconnected:
 		gs.state.ConductorIsConnected = false
-		gs.broadcast(game.MessageTypeConductorDisconnected, nil)
+		gs.sendTo("controllers", game.MessageTypeConductorDisconnected, nil)
 		return nil
 
 	case game.MessageTypeDisklavierDisconnected:
 		gs.state.DisklavierIsConnected = false
-		gs.broadcast(game.MessageTypeDisklavierDisconnected, nil)
+		gs.sendTo("controllers", game.MessageTypeDisklavierDisconnected, nil)
 		return nil
 
 	case game.MessageTypeJoin:
@@ -183,7 +183,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 		}
 		gs.state.Players[fingerprint].ConnectionState = game.ConnectionStateConnected
 		gs.sendTo(msg.Player, game.MessageTypeState, gs.state.Bytes())
-		gs.broadcast(game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[fingerprint].Bytes())
+		gs.sendTo("controllers", game.MessageTypeBroadcastConnectedPlayer, gs.state.Players[fingerprint].Bytes())
 		if notes := gs.state.Players[fingerprint].AssignedNotes; len(notes) > 0 {
 			gs.sendTo(fingerprint, game.MessageTypeAssignment, notes)
 		}
@@ -194,7 +194,17 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			return nil
 		}
 		gs.state.Players[msg.Player].ConnectionState = game.ConnectionStateDisconnected
-		gs.broadcast(game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
+		gs.sendTo("controllers", game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
+		return nil
+
+	case game.MessageTypeStartTutorial:
+		gs.state.Players[msg.Player].HasStartedTutorial = true
+		gs.sendTo("controllers", game.MessageTypeStartTutorial, []byte(msg.Player))
+		return nil
+	case game.MessageTypeCompleteTutorial:
+		gs.state.Players[msg.Player].HasStartedTutorial = true
+		gs.state.Players[msg.Player].HasCompletedTutorial = true
+		gs.sendTo("controllers", game.MessageTypeCompleteTutorial, []byte(msg.Player))
 		return nil
 
 	case game.MessageTypeSubmitPartialTrack:
@@ -207,7 +217,7 @@ func (gs *GameServer) handleMessage(msg *game.Message) error {
 			gs.state.Players[msg.Player] = &game.Player{}
 		}
 		gs.state.Players[msg.Player].HasSubmitted = true
-		gs.broadcast(game.MessageTypeBroadcastSubmittedTrack, []byte(msg.Player))
+		gs.sendTo("controllers", game.MessageTypeBroadcastSubmittedTrack, []byte(msg.Player))
 		if !gs.sentSwitchToVideoModal {
 			gs.sentSwitchToVideoModal = true
 			gs.sendTo("disklavier", game.MessageTypeBroadcastControllerModal, []byte("switch output to video"))
