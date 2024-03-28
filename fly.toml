@@ -10,7 +10,7 @@ primary_region = "ord"
   dockerfile = "Dockerfile"
 
 [[vm]]
-  size = "performance-2x"
+  size = "shared-cpu-1x"
 
 [[mounts]]
   source = "piano_alone_data"
