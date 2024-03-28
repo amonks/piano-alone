@@ -361,7 +361,7 @@ func (c *GameClient) handleMessage(m message) error {
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
-			overlay.Set("innerHTML", "Then, we’ll listen to all our parts together on the Disklavier.")
+			overlay.Set("innerHTML", "Then, the combined performance will be available as a MIDI file.")
 			show(overlay, "0.5s")
 			time.Sleep(time.Second * 2)
 			hide(overlay, "0.5s")
@@ -400,7 +400,7 @@ func (c *GameClient) handleMessage(m message) error {
 		return nil
 
 	case msgLookAtDisklavier:
-		overlay.Set("innerHTML", "Done!<br />When everyone else is finished, we’ll hear our performance on the disklavier.")
+		overlay.Set("innerHTML", "Done!<br />When everyone else is finished, our performance will be available as a MIDI file.")
 		show(overlay, "0.5s")
 		time.Sleep(time.Second * 2)
 		return nil

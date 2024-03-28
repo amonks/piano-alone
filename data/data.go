@@ -7,7 +7,8 @@ const (
 )
 
 var (
-	PerformanceDate = mustParseTime("2006-01-02 15:04:05 MST", "2024-03-23 1:00:00 CDT")
+	PerformanceDate       = mustParseTime("2006-01-02 15:04:05 MST", "2024-03-23 1:00:00 CDT")
+	SecondPerformanceDate = mustParseTime("2006-01-02 15:04:05 MST", "2024-03-23 4:00:00 CDT")
 )
 
 const (

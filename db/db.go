@@ -27,7 +27,7 @@ func OpenDB(path string) (*DB, error) {
 
 	var count int64
 	if err = db.Model(&game.Performance{}).
-		Where("date = ?", data.PerformanceDate).
+		Where("date = ?", data.SecondPerformanceDate).
 		Count(&count).
 		Error; err != nil {
 		return nil, err
@@ -39,8 +39,8 @@ func OpenDB(path string) (*DB, error) {
 				Title:         "Prelude in C♯ Minor",
 				Composer:      "Sergei Rachmaninoff",
 			},
-			Date:       data.PerformanceDate,
-			IsFeatured: true,
+			Date:       data.SecondPerformanceDate,
+			IsFeatured: false,
 		}).Error; err != nil {
 			return nil, err
 		}
