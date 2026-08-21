@@ -104,11 +104,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.log = append(m.log, msg)
 		switch msg.Type {
 		case game.MessageTypeState:
-			m.state = game.StateFromBytes(msg.Data)
+			state, err := game.StateFromBytes(msg.Data)
+			if err != nil {
+				return m, m.acceptMessage
+			}
+			m.state = state
 			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastPhase:
-			phase := game.PhaseFromBytes(msg.Data)
+			phase, err := game.PhaseFromBytes(msg.Data)
+			if err != nil {
+				return m, m.acceptMessage
+			}
 			m.state.Phase = phase
 			return m, m.acceptMessage
 
@@ -127,7 +134,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.acceptMessage
 
 		case game.MessageTypeBroadcastConnectedPlayer:
-			player := game.PlayerFromBytes(msg.Data)
+			player, err := game.PlayerFromBytes(msg.Data)
+			if err != nil {
+				return m, m.acceptMessage
+			}
 			m.state.Players[player.Fingerprint] = player
 			return m, m.acceptMessage
 		case game.MessageTypeBroadcastDisconnectedPlayer:
@@ -472,7 +482,10 @@ func (m model) acceptMessage() tea.Msg {
 	}
 	switch mt {
 	case websocket.BinaryMessage:
-		msg := game.MessageFromBytes(bs)
+		msg, err := game.MessageFromBytes(bs)
+		if err != nil {
+			return msgQuit(fmt.Sprintf("malformed message: %s", err))
+		}
 		return msgGotWSMessage(msg)
 	default:
 		return msgQuit("unexpected message type")
@@ -521,7 +534,10 @@ func (m model) checkScheduledPerformances() tea.Msg {
 	if err != nil {
 		return msgQuit(err.Error())
 	}
-	ps := game.PerformancesFromBytes(bs)
+	ps, err := game.PerformancesFromBytes(bs)
+	if err != nil {
+		return msgQuit(err.Error())
+	}
 	return msgGotScheduledPerformances(ps)
 }
 

@@ -23,4 +23,3 @@ func NewWithCancel() (context.Context, func(err error)) {
 	}()
 	return ctx, cancel
 }
-

@@ -11,19 +11,11 @@ import (
 )
 
 var (
-	yellow  = lipgloss.Color("#B58900")
-	orange  = lipgloss.Color("#CB4B16")
-	red     = lipgloss.Color("#DC322F")
-	magenta = lipgloss.Color("#D33682")
-	violet  = lipgloss.Color("#6C71C4")
-	blue    = lipgloss.Color("#268BD2")
-	cyan    = lipgloss.Color("#2AA198")
-	green   = lipgloss.Color("#859900")
+	orange = lipgloss.Color("#CB4B16")
+	red    = lipgloss.Color("#DC322F")
+	green  = lipgloss.Color("#859900")
 
 	xxxLight = lipgloss.Color("#FDF6E3") // base3
-	xxLight  = lipgloss.Color("#EEE8D5") // base2
-	xLight   = lipgloss.Color("#93A1A1") // base1
-	light    = lipgloss.Color("#839496") // base0
 	dark     = lipgloss.Color("#657B83") // base00
 	xDark    = lipgloss.Color("#586E75") // base01
 	xxDark   = lipgloss.Color("#073642") // base02
@@ -55,10 +47,6 @@ var (
 			Background(xxxDark).
 			Foreground(xxxLight)
 
-	contentStyle = lipgloss.NewStyle().
-			Background(xxxDark).
-			Foreground(xxxLight).
-			Padding(1, 4)
 	headerStyle = lipgloss.NewStyle().
 			Background(xxDark).
 			Foreground(orange).
@@ -71,11 +59,6 @@ var (
 			Border(lipgloss.NormalBorder()).
 			BorderBackground(xxxDark).
 			BorderForeground(dark).
-			Padding(0, 1)
-	focusedBoxStyle = lipgloss.NewStyle().
-			Border(lipgloss.NormalBorder()).
-			BorderBackground(xxxDark).
-			BorderForeground(xxxLight).
 			Padding(0, 1)
 	boxHeaderStyle = lipgloss.NewStyle().
 			Background(xxxDark).
@@ -107,7 +90,7 @@ var (
 			Background(lipgloss.Color("#93A1A1")).
 			Foreground(xxxDark).
 			Padding(0, 3)
-	activeButtonStyle = buttonStyle.Copy().
+	activeButtonStyle = buttonStyle.
 				Background(lipgloss.Color("#FDF6E3")).
 				Foreground(xxDark).
 				Underline(true)
@@ -133,11 +116,11 @@ func (m model) view() string {
 }
 
 func (m model) viewHeader() string {
-	return headerStyle.Copy().Width(m.width).Render("LIFE ONLINE: Piano Telephone")
+	return headerStyle.Width(m.width).Render("LIFE ONLINE: Piano Telephone")
 }
 
 func (m model) viewModal() string {
-	return zone.Mark("Modal", modalStyle.Copy().Width(m.width).Height(m.height).Render(
+	return zone.Mark("Modal", modalStyle.Width(m.width).Height(m.height).Render(
 		modalHeaderStyle.Render(m.modal)+"\n"+modalDismisserStyle.Render("press any key to dismiss"),
 	))
 }
@@ -151,7 +134,7 @@ func (m model) viewMenu() string {
 			content.WriteString(zone.Mark(item, menuItemStyle.Render(item)) + "\n")
 		}
 	}
-	menuStyle := boxStyle.Copy().Height(m.height - 4)
+	menuStyle := boxStyle.Height(m.height - 4)
 	if !m.contentInFocus {
 		menuStyle = menuStyle.BorderForeground(lipgloss.Color("#FFFFFF"))
 	}
@@ -174,7 +157,7 @@ func (m model) viewContent() string {
 	default:
 		content = "?"
 	}
-	contentStyle := boxStyle.Copy().Height(m.height - 4).Width(m.width - menuWidth - 2)
+	contentStyle := boxStyle.Height(m.height - 4).Width(m.width - menuWidth - 2)
 	if m.contentInFocus {
 		contentStyle = contentStyle.BorderForeground(lipgloss.Color("#FFFFFF"))
 	}
@@ -401,7 +384,7 @@ func (m model) viewSelectedMIDIOutPort() string {
 
 func (m model) viewStatusbar() string {
 	if m.quitting != "" {
-		return msgStyle.Copy().Width(m.width).Render(
+		return msgStyle.Width(m.width).Render(
 			fmt.Sprintf("press %s again to quit", m.quitting),
 		)
 	}
@@ -415,10 +398,10 @@ func (m model) viewStatusbar() string {
 	default:
 		msg = fmt.Sprintf("%s is newer, press u to update", m.latestVersion)
 	}
-	return statusbarStyle.Copy().Width(m.width).Render(
+	return statusbarStyle.Width(m.width).Render(
 		lipgloss.JoinHorizontal(lipgloss.Top,
 			versionStyle.Render(data.CurrentVersion),
-			msgStyle.Copy().Width(m.width-lipgloss.Width(data.CurrentVersion)-2).Render(msg),
+			msgStyle.Width(m.width-lipgloss.Width(data.CurrentVersion)-2).Render(msg),
 		),
 	)
 }

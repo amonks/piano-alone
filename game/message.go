@@ -1,8 +1,6 @@
 package game
 
 import (
-	"bytes"
-	"encoding/gob"
 	"fmt"
 )
 
@@ -50,31 +48,51 @@ const (
 	MessageTypeAdvancePhase
 )
 
-func (m *Message) String() string {
-	switch m.Type {
-	case MessageTypeBroadcastPhase:
-		phase := PhaseFromBytes(m.Data)
-		return fmt.Sprintf("%s: %s [%s]", m.Player, m.Type, phase)
+// Control reports whether this message type drives the performance:
+// the three the conductor sends, which are the whole of what the game
+// loop will act on from anyone. Everything else is a player reporting
+// on itself or the server talking to a client.
+func (t MessageType) Control() bool {
+	switch t {
+	case MessageTypeRestart, MessageTypeAdvancePhase, MessageTypeBeginPerformance:
+		return true
 	default:
-		return m.Type.String()
+		return false
 	}
 }
 
-func (m *Message) Bytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(m); err != nil {
-		panic(err)
+// ServerOnly reports whether this message type is the server's own
+// account of something rather than a client's report about itself.
+// The four presence types are synthesized where a controller socket
+// opens and closes; a client that sends one is claiming a connection
+// exists that the server has not seen.
+func (t MessageType) ServerOnly() bool {
+	switch t {
+	case MessageTypeDisklavierConnected, MessageTypeDisklavierDisconnected,
+		MessageTypeConductorConnected, MessageTypeConductorDisconnected:
+		return true
+	default:
+		return false
 	}
-	return buf.Bytes()
 }
 
-func MessageFromBytes(bs []byte) *Message {
-	buf := bytes.NewReader(bs)
-	dec := gob.NewDecoder(buf)
-	var m Message
-	if err := dec.Decode(&m); err != nil {
-		panic(err)
+func (m *Message) String() string {
+	if m.Type == MessageTypeBroadcastPhase {
+		// A phase that will not decode is not worth failing a log line
+		// over; the type alone still says what happened.
+		if phase, err := PhaseFromBytes(m.Data); err == nil {
+			return fmt.Sprintf("%s: %s [%s]", m.Player, m.Type, phase)
+		}
 	}
-	return &m
+	return m.Type.String()
+}
+
+func (m *Message) Bytes() []byte { return encode(m) }
+
+func MessageFromBytes(bs []byte) (*Message, error) {
+	m, err := decode[Message]("message", bs)
+	if err != nil {
+		return nil, err
+	}
+	return &m, nil
 }

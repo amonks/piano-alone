@@ -8,4 +8,3 @@ const (
 	ConnectionStateDisconnected
 	ConnectionStateConnected
 )
-

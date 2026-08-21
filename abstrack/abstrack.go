@@ -110,7 +110,7 @@ func (at *AbsTrack) CountNotes() []CountedKey {
 }
 
 func (at *AbsTrack) Select(notes []uint8) *AbsTrack {
-	if at.Events[0].Timestamp < 0 {
+	if len(at.Events) > 0 && at.Events[0].Timestamp < 0 {
 		panic("invalid track")
 	}
 	noteSet := map[uint8]struct{}{}

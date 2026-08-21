@@ -1,15 +1,10 @@
 package data
 
-import "time"
-
-const (
-	CurrentVersion = "3.1.0"
-)
-
-var (
-	PerformanceDate       = mustParseTime("2006-01-02 15:04:05 MST", "2024-03-23 1:00:00 CDT")
-	SecondPerformanceDate = mustParseTime("2006-01-02 15:04:05 MST", "2024-03-23 4:00:00 CDT")
-)
+// CurrentVersion is the disklavier client build this server serves at
+// /latest-client. A running client polls /latest-client-version and
+// offers to update itself when the two differ, so bumping this is what
+// tells deployed clients there is something new to fetch.
+const CurrentVersion = "3.1.0"
 
 const (
 	PathLatestClientVersion   = "GET /latest-client-version"
@@ -25,11 +20,3 @@ const (
 	PathBeginPerformance      = "POST /performances/{id}/begin"
 	PathDeletePerformance     = "DELETE /performances/{id}"
 )
-
-func mustParseTime(fmt string, t string) time.Time {
-	if out, err := time.Parse(fmt, t); err != nil {
-		panic(err)
-	} else {
-		return out
-	}
-}

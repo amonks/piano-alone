@@ -37,7 +37,12 @@ func main() {
 	}
 
 	if _, err := wc.OnMessage(func(bs []byte) {
-		inbox <- game.MessageFromBytes(bs)
+		m, err := game.MessageFromBytes(bs)
+		if err != nil {
+			log.Printf("dropping malformed message: %s", err)
+			return
+		}
+		inbox <- m
 	}); err != nil {
 		panic(err)
 	}

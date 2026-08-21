@@ -14,7 +14,7 @@ func TestHashSelectIsAlwaysBelowCap(t *testing.T) {
 
 func TestHashSelectVaries(t *testing.T) {
 	got := map[int]struct{}{}
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		got[hashSelect([]byte{byte(i)}, 1e3)] = struct{}{}
 	}
 	assert.Len(t, got, 256)

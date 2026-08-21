@@ -1,0 +1,15 @@
+# Build artifacts. Sources of truth:
+#   main.wasm     — ./gameplayer, built by tasks.toml's wasm task
+#   wasm_exec.js  — $(go env GOROOT)/lib/wasm/wasm_exec.js (copied)
+#   style.css     — css/style.css through postcss (build-css task)
+#   *.gz, *.br    — not produced here; the host compresses on the wire
+#
+# They are absent from a fresh checkout, and the embed below is a
+# directory embed so the module still builds without them — a server
+# started without running `run generate` first serves a page whose
+# stylesheet and player are missing, rather than failing to compile.
+main.wasm
+wasm_exec.js
+style.css
+*.gz
+*.br

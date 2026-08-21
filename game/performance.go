@@ -1,55 +1,29 @@
 package game
 
-import (
-	"bytes"
-	"encoding/gob"
-	"time"
-)
+import "time"
 
 type Performance struct {
-	Configuration *Configuration `gorm:"embedded"`
-	Date          time.Time      `gorm:"column:date"`
-	IsFeatured    bool           `gorm:"column:is_featured"`
+	Configuration *Configuration
+	Date          time.Time
+	IsFeatured    bool
 
-	IsComplete  bool   `gorm:"column:is_complete"`
-	Rendition   []byte `gorm:"column:rendition"`
-	PlayerCount int    `gorm:"column:player_count"`
+	IsComplete  bool
+	Rendition   []byte
+	PlayerCount int
 }
 
-func PerformanceFromBytes(bs []byte) *Performance {
-	buf := bytes.NewReader(bs)
-	dec := gob.NewDecoder(buf)
-	var s Performance
-	if err := dec.Decode(&s); err != nil {
-		panic(err)
+func PerformanceFromBytes(bs []byte) (*Performance, error) {
+	p, err := decode[Performance]("performance", bs)
+	if err != nil {
+		return nil, err
 	}
-	return &s
+	return &p, nil
 }
 
-func (s *Performance) Bytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(s); err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
+func (s *Performance) Bytes() []byte { return encode(s) }
+
+func PerformancesFromBytes(bs []byte) ([]*Performance, error) {
+	return decode[[]*Performance]("performances", bs)
 }
 
-func PerformancesFromBytes(bs []byte) []*Performance {
-	buf := bytes.NewReader(bs)
-	dec := gob.NewDecoder(buf)
-	var s []*Performance
-	if err := dec.Decode(&s); err != nil {
-		panic(err)
-	}
-	return s
-}
-
-func PerformancesToBytes(ps []*Performance) []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(ps); err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
+func PerformancesToBytes(ps []*Performance) []byte { return encode(ps) }

@@ -1,9 +1,6 @@
 package game
 
 import (
-	"bytes"
-	"encoding/gob"
-
 	"monks.co/piano-alone/baseurl"
 	"monks.co/piano-alone/data"
 )
@@ -69,21 +66,12 @@ func (s *State) CountSubmittedTracks() int {
 	return n
 }
 
-func StateFromBytes(bs []byte) *State {
-	buf := bytes.NewReader(bs)
-	dec := gob.NewDecoder(buf)
-	var s State
-	if err := dec.Decode(&s); err != nil {
-		panic(err)
+func StateFromBytes(bs []byte) (*State, error) {
+	s, err := decode[State]("state", bs)
+	if err != nil {
+		return nil, err
 	}
-	return &s
+	return &s, nil
 }
 
-func (s *State) Bytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(s); err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
+func (s *State) Bytes() []byte { return encode(s) }

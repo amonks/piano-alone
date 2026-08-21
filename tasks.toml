@@ -1,75 +1,83 @@
+# This module publishes to a public mirror, so `publish-validate` checks
+# it with `GOWORK=off go mod tidy -diff`, and `generate` re-tidies only
+# modules that own a tidy task — see specs/publish.md.
+
 [[task]]
   id = "dev"
   type = "long"
-  dependencies = [
-    "build-css",
-    "build-templates",
-    "build-wasm",
-    "generate",
-    "generate-canvas-api-wrapper",
-  ]
-  watch = ["**/*.go", "css/*.css"]
-  cmd = "go run ./gameserver"
+  dependencies = ["build"]
+  triggers = ["build"]
+  cmd = "../../bin/piano-alone"
 
 [[task]]
-  id = "deploy"
-  type = "short"
-  cmd = "fly deploy"
-  dependencies = ["assemble-dependencies"]
-
-[[task]]
-  # used in dockerfile
-  # do not add dependencies:
-  # assumes pre-build has already run outside the dockerfile
   id = "build"
   type = "short"
-  cmd = "go build -o ./serve ./gameserver"
+  watch = ["**/*.go", "*.go"]
+  dependencies = ["templ", "build-css", "wasm"]
+  cmd = "go build -o ../../bin/piano-alone ."
 
 [[task]]
-  id = "assemble-dependencies"
+  id = "templ"
   type = "short"
-  dependencies = [
-    "build-client",
-    "build-templates",
-    "build-wasm",
-    "generate",
-    "generate-canvas-api-wrapper",
-    "build-css",
-  ]
+  watch = ["**/*.templ"]
+  cmd = "go tool templ generate"
 
+# The player is a Go program compiled to wasm and embedded, so the
+# server binary carries the client it serves. Both flags are the
+# monorepo's hard-won ones (pkg/hermit/tasks.toml): -buildvcs=false
+# because the VCS stamp bakes the current commit into the wasm, which
+# in a colocated checkout busts Go's test cache on every commit; and
+# cp -f because GOROOT's wasm_exec.js is mode 444, so a plain cp cannot
+# overwrite what the last run left.
+#
+# -ldflags "-s -w" strips DWARF and the name section. It costs browser
+# stack-trace symbols and saves about a fifth of a 10 MB download that
+# an audience fetches on phones, at a venue, at the same moment.
 [[task]]
-  id = "test"
+  id = "wasm"
   type = "short"
-  dependencies = [
-    "generate",
-    "build-wasm",
-    "build-templates",
-    "generate-canvas-api-wrapper",
-    "build-css",
-  ]
+  watch = ["gameplayer/**/*.go", "game/**/*.go", "c2d/*.go", "canvas/*.go", "jsws/*.go", "notefreqs/*.go", "storage/*.go", "baseurl/*.go"]
   cmd = """
-    go test ./...
-    go vet ./...
-    go run honnef.co/go/tools/cmd/staticcheck ./...
-    go run golang.org/x/vuln/cmd/govulncheck ./...
+    set -e
+    GOOS=js GOARCH=wasm go build -buildvcs=false -ldflags="-s -w" -o "$PWD/assets/files/main.wasm" ./gameplayer
+    cp -f "$(go env GOROOT)/lib/wasm/wasm_exec.js" assets/files/wasm_exec.js
   """
-
-[[task]]
-  id = "npm-install"
-  type = "short"
-  cmd = "npm install"
 
 [[task]]
   id = "build-css"
   type = "short"
-  cmd = "./node_modules/.bin/postcss -o templates/style.css css/style.css"
-  watch = ["./css/**", "./templates/*.templ"]
-  dependencies = ["npm-install"]
+  watch = ["css/**", "templates/*.templ", "gameplayer/*.go"]
+  dependencies = ["install-css"]
+  cmd = "./node_modules/.bin/postcss -o assets/files/style.css css/style.css"
 
+# npm ci rather than npm install: this runs inside CI's generate, where
+# a lockfile rewrite — an npm that decides to migrate lockfileVersion,
+# say — would fail check-for-diff on churn nobody authored.
+[[task]]
+  id = "install-css"
+  type = "short"
+  cmd = "npm ci"
+
+[[task]]
+  id = "tidy"
+  type = "short"
+  dependencies = ["templ"]
+  cmd = "go mod tidy -e"
+
+[[task]]
+  id = "generate"
+  type = "short"
+  dependencies = ["tidy", "templ", "build-css", "wasm"]
+
+# The macOS client that drives the disklavier: a signed, notarized
+# universal binary. It is built by hand on a Mac and handed to a
+# running server as a file (the -client flag), because notarization
+# needs Apple's toolchain and a signing identity, and the builder is
+# linux. Needs $APP_SPECIFIC_PASSWORD and a keychain holding the
+# Developer ID certificate.
 [[task]]
   id = "build-client"
   type = "short"
-  dependencies = ["generate"]
   cmd = """
     set -xeuo pipefail
 
@@ -101,44 +109,7 @@
       --apple-id a@monks.co \
       --team-id 89WR6ARSCL \
       --password $APP_SPECIFIC_PASSWORD \
-      --wait ./macos-client-universal.zip \
-      2>&1 | tee /tmp/notarization_info.json
+      --wait ./macos-client-universal.zip
 
     rm macos-client-universal.zip
-
-  """
-
-[[task]]
-  id = "build-wasm"
-  type = "short"
-  watch = ["**/*.go"]
-  dependencies = ["generate", "generate-canvas-api-wrapper"]
-  cmd = "GOOS=js GOARCH=wasm go build -o main.wasm ./gameplayer"
-
-[[task]]
-  id = "build-templates"
-  type = "short"
-  watch = ["templates/*.templ"]
-  dependencies = ["generate"]
-  cmd = "go run github.com/a-h/templ/cmd/templ generate"
-
-[[task]]
-  id = "generate"
-  type = "short"
-  cmd = "go generate ./..."
-  # can't have *.go as a "watch" here, because generate touches *.go files.
-
-[[task]]
-  id = "generate-canvas-api-wrapper"
-  type = "short"
-  watch = ["generate_canvas_api_wrapper/main.ts", "generate_canvas_api_wrapper/package.json"]
-  cmd = """
-    cd generate_canvas_api_wrapper
-    rm dist/*
-    yarn
-    yarn tsc
-    node dist/main.js
-    mv out.go ../c2d/c2d_wasm.go
-    go fmt ../c2d/c2d_wasm.go
-    echo "done building wrapper"
   """

@@ -1,12 +1,16 @@
-performances.db
+# The disklavier client is built and notarized by hand on a Mac
+# (tasks.toml's build-client) and handed to a running server as a
+# file, so it is never part of a checkout.
+macos-client-universal
+macos-client-universal.zip
 
+# The signing identity build-client wants, and the environment that
+# holds its password. Neither is ignored at the repo root.
 Certificates.p12
 .envrc
-website/main.wasm
 
-macos-client-universal.zip
-macos-client-universal
-main.wasm
-serve
+# A standalone server's database, if it is run from here.
+piano-alone.db
+performances.db
 
 node_modules

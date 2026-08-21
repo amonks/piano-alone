@@ -433,12 +433,19 @@ func (c *GameClient) handleMessage(m message) error {
 
 		case game.MessageTypeState:
 			isInit := c.state == nil
-			c.state = game.StateFromBytes(m.Data)
+			state, err := game.StateFromBytes(m.Data)
+			if err != nil {
+				return err
+			}
+			c.state = state
 			if !isInit {
 				return nil
 			}
+			// A state that arrives before this player is in it — a
+			// late join, a restart — leaves them unassigned, which is
+			// the same case as joining with no notes yet.
 			me := c.state.Players[c.fingerprint]
-			hasAssignment := len(me.AssignedNotes) > 0
+			hasAssignment := me != nil && len(me.AssignedNotes) > 0
 
 			switch c.state.Phase {
 
@@ -470,7 +477,10 @@ func (c *GameClient) handleMessage(m message) error {
 
 		case game.MessageTypeBroadcastPhase:
 			before := c.state.Phase
-			after := game.PhaseFromBytes(m.Data)
+			after, err := game.PhaseFromBytes(m.Data)
+			if err != nil {
+				return err
+			}
 			c.state.Phase = after
 			if before == game.GamePhaseUninitialized && after == game.GamePhaseLobby {
 				go func() { c.loopback <- msgShowLobby{} }()
@@ -485,12 +495,17 @@ func (c *GameClient) handleMessage(m message) error {
 			return nil
 
 		case game.MessageTypeBroadcastConnectedPlayer:
-			player := game.PlayerFromBytes(m.Data)
+			player, err := game.PlayerFromBytes(m.Data)
+			if err != nil {
+				return err
+			}
 			c.state.Players[player.Fingerprint] = player
 			return nil
 
 		case game.MessageTypeBroadcastDisconnectedPlayer:
-			c.state.Players[string(m.Data)].ConnectionState = game.ConnectionStateDisconnected
+			if player, ok := c.state.Players[string(m.Data)]; ok {
+				player.ConnectionState = game.ConnectionStateDisconnected
+			}
 			return nil
 
 		case game.MessageTypeAssignment:

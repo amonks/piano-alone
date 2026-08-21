@@ -1,10 +1,5 @@
 package game
 
-import (
-	"bytes"
-	"encoding/gob"
-)
-
 type Player struct {
 	ConnectionState      ConnectionState
 	Fingerprint          string
@@ -15,21 +10,12 @@ type Player struct {
 	HasSubmitted         bool
 }
 
-func PlayerFromBytes(bs []byte) *Player {
-	buf := bytes.NewReader(bs)
-	dec := gob.NewDecoder(buf)
-	var p Player
-	if err := dec.Decode(&p); err != nil {
-		panic(err)
+func PlayerFromBytes(bs []byte) (*Player, error) {
+	p, err := decode[Player]("player", bs)
+	if err != nil {
+		return nil, err
 	}
-	return &p
+	return &p, nil
 }
 
-func (p *Player) Bytes() []byte {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	if err := enc.Encode(p); err != nil {
-		panic(err)
-	}
-	return buf.Bytes()
-}
+func (p *Player) Bytes() []byte { return encode(p) }
