@@ -3,7 +3,7 @@ module monks.co/piano-alone
 go 1.26.6
 
 require (
-	github.com/a-h/templ v0.3.1001
+	github.com/a-h/templ v0.3.1020
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
