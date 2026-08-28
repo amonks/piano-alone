@@ -26,20 +26,28 @@ import (
 // page that wanted the file fails, and the process keeps serving.
 
 func style(filename string) templ.Component {
-	return wrapped(filename, "<style>\n", "\n</style>\n")
+	return wrapped(filename, func(context.Context) string { return "<style>\n" }, "\n</style>\n")
 }
 
+// script carries the request's CSP nonce when the context has one (the
+// fleet's serve.Mux stamps the proxy's), so the inlined bundle is a
+// script the fleet's script-src policy admits.
 func script(filename string) templ.Component {
-	return wrapped(filename, "<script>\n", "\n</script>\n")
+	return wrapped(filename, func(ctx context.Context) string {
+		if nonce := templ.GetNonce(ctx); nonce != "" {
+			return "<script nonce=\"" + templ.EscapeString(nonce) + "\">\n"
+		}
+		return "<script>\n"
+	}, "\n</script>\n")
 }
 
-func wrapped(filename, open, close string) templ.Component {
+func wrapped(filename string, open func(context.Context) string, close string) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
 		input, err := assets.Read(filename)
 		if err != nil {
 			return fmt.Errorf("reading asset %s: %w", filename, err)
 		}
-		if _, err := io.WriteString(w, open); err != nil {
+		if _, err := io.WriteString(w, open(ctx)); err != nil {
 			return err
 		}
 		if _, err := w.Write(input); err != nil {
