@@ -13,7 +13,7 @@ require (
 	github.com/yuin/goldmark v1.7.17
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	modernc.org/sqlite v1.56.0
-	monks.co/pkg/migrate v0.0.15
+	monks.co/pkg/migrate v0.0.16
 )
 
 require (
