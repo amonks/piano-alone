@@ -13,7 +13,7 @@ require (
 	github.com/yuin/goldmark v1.7.17
 	gitlab.com/gomidi/midi/v2 v2.0.30
 	modernc.org/sqlite v1.56.0
-	monks.co/pkg/migrate v0.0.15
+	monks.co/pkg/migrate v0.0.17
 )
 
 require (
@@ -47,7 +47,6 @@ require (
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
-	golang.org/x/tools v0.50.0 // indirect
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	modernc.org/libc v1.74.4 // indirect
