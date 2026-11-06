@@ -12,6 +12,7 @@ import (
 
 	"monks.co/piano-alone/abstrack"
 	"monks.co/piano-alone/game"
+	"monks.co/piano-alone/recorder"
 )
 
 // What one performance can hold, whoever opens sockets. The player's
@@ -22,11 +23,14 @@ import (
 // played: its two audiences were twelve and six, and its largest
 // rendition, six players' parts merged, is 7 KB.
 const (
-	// maxPlayers is how many fingerprints one performance holds.
+	// maxPlayers is how many players one performance holds.
 	maxPlayers = 256
 	// maxPartBytes is the largest part a player may submit.
 	maxPartBytes = 64 << 10
 )
+
+// renditionBPM is the tempo a rendition is written at.
+const renditionBPM = 120
 
 // play is the game loop: one goroutine, one state, messages handled
 // strictly in the order they arrive, which is why nothing here takes a
@@ -75,12 +79,12 @@ func (s *Server) handle(ctx context.Context, msg *game.Message) (err error) {
 	return s.handleMessage(ctx, msg)
 }
 
-// player returns the state's record of a fingerprint, or nil. The
+// player returns the state's record of a player's id, or nil. The
 // tutorial messages used to index the map directly and assign through
 // the result, so a player who sent one before joining took the process
 // down with a nil dereference.
-func (s *Server) player(fingerprint string) *game.Player {
-	return s.state.Players[fingerprint]
+func (s *Server) player(id string) *game.Player {
+	return s.state.Players[id]
 }
 
 func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
@@ -119,13 +123,13 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		s.state.Phase = game.GamePhaseUninitialized
 		s.state.Configuration = configuration
 		s.state.Rendition = nil
-		for fingerprint, player := range s.state.Players {
+		for id, player := range s.state.Players {
 			if player.ConnectionState != game.ConnectionStateConnected {
-				delete(s.state.Players, fingerprint)
+				delete(s.state.Players, id)
 				continue
 			}
-			s.state.Players[fingerprint] = &game.Player{
-				Fingerprint:     fingerprint,
+			s.state.Players[id] = &game.Player{
+				Fingerprint:     id,
 				NoteCapacity:    player.NoteCapacity,
 				ConnectionState: game.ConnectionStateConnected,
 			}
@@ -145,23 +149,23 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 	case game.MessageTypeConductorConnected:
 		s.state.ConductorIsConnected = true
 		s.sendTo(ctx, msg.Player, game.MessageTypeState, s.state.Bytes())
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeConductorConnected, nil)
+		s.sendTo(ctx, toControllers, game.MessageTypeConductorConnected, nil)
 		return nil
 
 	case game.MessageTypeDisklavierConnected:
 		s.state.DisklavierIsConnected = true
 		s.sendTo(ctx, msg.Player, game.MessageTypeState, s.state.Bytes())
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeDisklavierConnected, nil)
+		s.sendTo(ctx, toControllers, game.MessageTypeDisklavierConnected, nil)
 		return nil
 
 	case game.MessageTypeConductorDisconnected:
 		s.state.ConductorIsConnected = false
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeConductorDisconnected, nil)
+		s.sendTo(ctx, toControllers, game.MessageTypeConductorDisconnected, nil)
 		return nil
 
 	case game.MessageTypeDisklavierDisconnected:
 		s.state.DisklavierIsConnected = false
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeDisklavierDisconnected, nil)
+		s.sendTo(ctx, toControllers, game.MessageTypeDisklavierDisconnected, nil)
 		return nil
 
 	case game.MessageTypeJoin:
@@ -169,30 +173,30 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		if err != nil {
 			return err
 		}
-		// The fingerprint is the connection's, not the join message's.
-		// A player used to be able to name any fingerprint here and be
-		// registered as it.
-		fingerprint := msg.Player
-		if s.player(fingerprint) == nil {
+		// Who joins is the connection's to say, not the join
+		// message's. A player used to be able to name any fingerprint
+		// here and be registered as it.
+		id := msg.Player
+		if s.player(id) == nil {
 			if len(s.state.Players) >= maxPlayers && !s.evictLeaver() {
 				// Sent the state all the same: the page waits on it to
 				// know where the performance is.
 				s.log.WarnContext(ctx, "refusing a join: the performance is full",
-					"piano.origin", fingerprint, "piano.players", len(s.state.Players))
-				s.sendTo(ctx, fingerprint, game.MessageTypeState, s.state.Bytes())
+					"piano.origin", id, "piano.players", len(s.state.Players))
+				s.sendTo(ctx, id, game.MessageTypeState, s.state.Bytes())
 				return nil
 			}
-			s.state.Players[fingerprint] = &game.Player{
-				Fingerprint:  fingerprint,
+			s.state.Players[id] = &game.Player{
+				Fingerprint:  id,
 				NoteCapacity: joinMessage.NoteCapacity,
 			}
 		}
-		player := s.player(fingerprint)
+		player := s.player(id)
 		player.ConnectionState = game.ConnectionStateConnected
-		s.sendTo(ctx, fingerprint, game.MessageTypeState, s.state.Bytes())
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeBroadcastConnectedPlayer, player.Bytes())
+		s.sendTo(ctx, id, game.MessageTypeState, s.state.Bytes())
+		s.sendTo(ctx, toControllers, game.MessageTypeBroadcastConnectedPlayer, player.Bytes())
 		if notes := player.AssignedNotes; len(notes) > 0 {
-			s.sendTo(ctx, fingerprint, game.MessageTypeAssignment, notes)
+			s.sendTo(ctx, id, game.MessageTypeAssignment, notes)
 		}
 		return nil
 
@@ -202,7 +206,7 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 			return nil
 		}
 		player.ConnectionState = game.ConnectionStateDisconnected
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
+		s.sendTo(ctx, toControllers, game.MessageTypeBroadcastDisconnectedPlayer, []byte(msg.Player))
 		return nil
 
 	case game.MessageTypeStartTutorial:
@@ -211,7 +215,7 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 			return nil
 		}
 		player.HasStartedTutorial = true
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeStartTutorial, []byte(msg.Player))
+		s.sendTo(ctx, toControllers, game.MessageTypeStartTutorial, []byte(msg.Player))
 		return nil
 
 	case game.MessageTypeCompleteTutorial:
@@ -220,7 +224,7 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 			return nil
 		}
 		player.HasStartedTutorial, player.HasCompletedTutorial = true, true
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeCompleteTutorial, []byte(msg.Player))
+		s.sendTo(ctx, toControllers, game.MessageTypeCompleteTutorial, []byte(msg.Player))
 		return nil
 
 	case game.MessageTypeSubmitPartialTrack:
@@ -236,7 +240,11 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		case s.state.Phase != game.GamePhaseHero:
 			refusal = "outside Hero"
 		case player == nil:
-			refusal = "from a fingerprint that never joined"
+			refusal = "from a player who never joined"
+		case len(player.AssignedNotes) == 0:
+			// The rendition takes only a player's dealt keys from
+			// their part, so there is nothing to take from this one.
+			refusal = "from a player dealt no notes"
 		case len(msg.Data) > maxPartBytes:
 			refusal = fmt.Sprintf("larger than %d bytes", maxPartBytes)
 		default:
@@ -253,9 +261,9 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		}
 		s.partials[msg.Player] = msg.Data
 		player.HasSubmitted = true
-		s.sendTo(ctx, fingerprintControllers, game.MessageTypeBroadcastSubmittedTrack, []byte(msg.Player))
+		s.sendTo(ctx, toControllers, game.MessageTypeBroadcastSubmittedTrack, []byte(msg.Player))
 		s.log.InfoContext(ctx, "part submitted",
-			"piano.fingerprint", msg.Player,
+			"piano.player", msg.Player,
 			"piano.submitted", s.state.CountSubmittedTracks())
 		if !s.sentSwitchToVideoModal {
 			s.sentSwitchToVideoModal = true
@@ -276,9 +284,9 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 // performances; a leaver with notes may reload to play them, and keeps
 // their place.
 func (s *Server) evictLeaver() bool {
-	for fingerprint, p := range s.state.Players {
+	for id, p := range s.state.Players {
 		if p.ConnectionState != game.ConnectionStateConnected && len(p.AssignedNotes) == 0 && !p.HasSubmitted {
-			delete(s.state.Players, fingerprint)
+			delete(s.state.Players, id)
 			return true
 		}
 	}
@@ -341,9 +349,10 @@ func checkPart(bs []byte) error {
 	return nil
 }
 
-// mergePart merges one part's bytes into track, turning a panic in the
-// merge's asserted invariants into an error.
-func mergePart(track *abstrack.AbsTrack, bs []byte) (merged *abstrack.AbsTrack, err error) {
+// mergePart merges what one part's bytes may contribute — the keys
+// dealt, by onlyDealt — into track, turning a panic in the merge's
+// asserted invariants into an error.
+func mergePart(track *abstrack.AbsTrack, bs []byte, dealt []uint8) (merged *abstrack.AbsTrack, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			merged, err = nil, fmt.Errorf("merging: %v", r)
@@ -356,7 +365,43 @@ func mergePart(track *abstrack.AbsTrack, bs []byte) (merged *abstrack.AbsTrack, 
 	if err != nil {
 		return nil, err
 	}
-	return track.Merge(abstrack.FromSMF(f, 0)), nil
+	return track.Merge(onlyDealt(abstrack.FromSMF(f, 0), dealt)), nil
+}
+
+// onlyDealt is what a part contributes to the rendition: the strikes
+// and releases of the keys its player was dealt, on the recorder's
+// channel, and the track's end — nothing else. A part is sent from a
+// page anyone can rewrite, and merged whole it could play any key, on
+// any channel, or send the disklavier anything else MIDI carries: a
+// held pedal, a program change, a system exclusive. Its tempo goes
+// too. FromSMF has already used it to put the part's notes in absolute
+// time, and kept in the merge it would set the ticks every later note
+// in the rendition is written in, whoever played it; assemble writes
+// the rendition at a tempo of its own. The page records a tempo and
+// the player's notes on recorder.Channel, so nothing a player played
+// is lost.
+//
+// abstrack.Select is not this filter: it keeps the keys asked for and
+// passes every other kind of event through, which is right for showing
+// a player their score and wrong for taking what a page sends.
+func onlyDealt(part *abstrack.AbsTrack, dealt []uint8) *abstrack.AbsTrack {
+	keys := map[uint8]bool{}
+	for _, key := range dealt {
+		keys[key] = true
+	}
+	kept := abstrack.New()
+	for _, ev := range part.Events {
+		var channel, key, velocity uint8
+		switch {
+		case ev.Message.GetNoteStart(&channel, &key, &velocity), ev.Message.GetNoteEnd(&channel, &key):
+			if channel == recorder.Channel && keys[key] {
+				kept.Append(ev)
+			}
+		case ev.Message.Is(smf.MetaEndOfTrackMsg):
+			kept.Append(ev)
+		}
+	}
+	return kept
 }
 
 // advance moves the performance on one phase. Which phase it lands in
@@ -387,11 +432,11 @@ func (s *Server) assignNotes(ctx context.Context) error {
 	if s.state.Configuration == nil {
 		return errors.New("advancing out of the lobby with no performance configured")
 	}
-	var fingerprints []string
-	for f := range s.state.Players {
-		fingerprints = append(fingerprints, f)
+	var ids []string
+	for id := range s.state.Players {
+		ids = append(ids, id)
 	}
-	if len(fingerprints) == 0 {
+	if len(ids) == 0 {
 		s.log.InfoContext(ctx, "not advancing: nobody has joined")
 		return nil
 	}
@@ -402,7 +447,7 @@ func (s *Server) assignNotes(ctx context.Context) error {
 	}
 	notes := abstrack.FromSMF(score, 0).CountNotes()
 	for i, note := range notes {
-		player := s.state.Players[fingerprints[i%len(fingerprints)]]
+		player := s.state.Players[ids[i%len(ids)]]
 		if len(player.AssignedNotes) < player.NoteCapacity {
 			player.AssignedNotes = append(player.AssignedNotes, note.Key)
 		}
@@ -412,7 +457,7 @@ func (s *Server) assignNotes(ctx context.Context) error {
 	}
 	s.setPhase(ctx, game.GamePhaseHero)
 	s.log.InfoContext(ctx, "notes assigned",
-		"piano.players", len(fingerprints),
+		"piano.players", len(ids),
 		"piano.distinct_notes", len(notes))
 	return nil
 }
@@ -424,16 +469,27 @@ func (s *Server) assignNotes(ctx context.Context) error {
 func (s *Server) assemble(ctx context.Context) error {
 	s.setPhase(ctx, game.GamePhaseProcessing)
 
+	// The rendition's one tempo, which ToSMF writes every part's notes
+	// back into ticks at. The parts are merged in absolute time, so any
+	// tempo would do; this is MIDI's default, and the one the page
+	// records at.
 	track := abstrack.New()
-	for fingerprint, bs := range s.partials {
+	track.Append(abstrack.AbsEvent{Message: smf.MetaTempo(renditionBPM)})
+	for id, bs := range s.partials {
 		// Read again here rather than kept parsed since it was taken: a
 		// parsed SMF is several times its bytes. checkPart passed it
 		// when it was taken, so this cannot fail; if it somehow does,
-		// one part is not worth the rendition.
-		merged, err := mergePart(track, bs)
+		// one part is not worth the rendition. A part is taken only
+		// from a player in the state, and Begin drops the parts with
+		// the players, so every part has its player here.
+		var dealt []uint8
+		if player := s.player(id); player != nil {
+			dealt = player.AssignedNotes
+		}
+		merged, err := mergePart(track, bs, dealt)
 		if err != nil {
 			s.log.ErrorContext(ctx, "leaving a part out of the rendition",
-				"piano.fingerprint", fingerprint,
+				"piano.player", id,
 				"error.message", err.Error(),
 				"error.type", fmt.Sprintf("%T", err))
 			continue
@@ -478,11 +534,11 @@ func (s *Server) setPhase(ctx context.Context, phase game.Phase) {
 }
 
 func (s *Server) broadcast(ctx context.Context, msgType game.MessageType, payload []byte) {
-	s.out(ctx, game.NewMessage(msgType, fingerprintEveryone, payload))
+	s.out(ctx, game.NewMessage(msgType, toEveryone, payload))
 }
 
-func (s *Server) sendTo(ctx context.Context, fingerprint string, msgType game.MessageType, payload []byte) {
-	s.out(ctx, game.NewMessage(msgType, fingerprint, payload))
+func (s *Server) sendTo(ctx context.Context, to string, msgType game.MessageType, payload []byte) {
+	s.out(ctx, game.NewMessage(msgType, to, payload))
 }
 
 // out hands a message to the delivery goroutine. It is only ever

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net"
@@ -170,5 +171,184 @@ func TestServeVariesOnAcceptEncoding(t *testing.T) {
 	defer resp.Body.Close()
 	if vary := resp.Header.Get("Vary"); !strings.Contains(vary, "Accept-Encoding") {
 		t.Errorf("Vary = %q, want it to name Accept-Encoding", vary)
+	}
+}
+
+// socket is a client end of one of the server's sockets that keeps
+// every frame it is sent, for a test to look through afterwards.
+type socket struct {
+	conn   *websocket.Conn
+	frames [][]byte
+}
+
+func dial(t *testing.T, addr, target string) *socket {
+	t.Helper()
+	dialer := websocket.Dialer{HandshakeTimeout: 30 * time.Second}
+	conn, resp, err := dialer.Dial("ws://"+addr+target, nil)
+	if err != nil {
+		status := "no response"
+		if resp != nil {
+			status = resp.Status
+		}
+		t.Fatalf("dialing %s (%s): %v", target, status, err)
+	}
+	t.Cleanup(func() { conn.Close() })
+	return &socket{conn: conn}
+}
+
+func (s *socket) send(t *testing.T, msgType game.MessageType, data []byte) {
+	t.Helper()
+	s.write(t, game.NewMessage(msgType, "", data).Bytes())
+}
+
+func (s *socket) write(t *testing.T, frame []byte) {
+	t.Helper()
+	if err := s.conn.WriteMessage(websocket.BinaryMessage, frame); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// await reads until a message of the given type arrives, and returns
+// it. The deadline is a liveness backstop, not a timing assertion.
+func (s *socket) await(t *testing.T, msgType game.MessageType) *game.Message {
+	t.Helper()
+	s.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	for {
+		_, bs, err := s.conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("waiting for %s: %v", msgType, err)
+		}
+		s.frames = append(s.frames, bs)
+		m, err := game.MessageFromBytes(bs)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if m.Type == msgType {
+			return m
+		}
+	}
+}
+
+func post(t *testing.T, addr, target string, body []byte) {
+	t.Helper()
+	req, err := http.NewRequestWithContext(t.Context(), "POST", "http://"+addr+target, bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		t.Fatalf("POST %s: %s %s", target, resp.Status, b)
+	}
+}
+
+// A fingerprint is a player's whole credential: a socket that presents
+// one acts as that player. So no socket is ever told one — not a
+// player's, which is sent the whole state, and not the disklavier's,
+// which anyone may open and which hears of every player who joins,
+// starts the tutorial, or submits. Every state message used to carry
+// every player's fingerprint, so any player could take any other's
+// place. Players are known everywhere by PlayerID instead, a digest
+// the fingerprint cannot be recovered from, and a page finds itself in
+// the state by its own.
+func TestNoSocketIsToldAFingerprint(t *testing.T) {
+	addr := runServer(t)
+	conf := &game.Configuration{PerformanceID: "tonight", Title: "Tonight", Composer: "Somebody", Score: partOf(t, 60, 0)}
+	post(t, addr, "/performances", (&game.Performance{Configuration: conf}).Bytes())
+
+	disklavier := dial(t, addr, "/controller-ws?role=disklavier")
+	disklavier.await(t, game.MessageTypeState)
+
+	fingerprints := []string{strings.Repeat("a1", 128), strings.Repeat("b2", 128)}
+	var players []*socket
+	for _, f := range fingerprints {
+		p := dial(t, addr, "/ws?fingerprint="+f)
+		p.send(t, game.MessageTypeJoin, game.JoinMessage{Fingerprint: f, NoteCapacity: 3}.Bytes())
+		p.await(t, game.MessageTypeState)
+		p.send(t, game.MessageTypeStartTutorial, nil)
+		players = append(players, p)
+	}
+	for range players {
+		disklavier.await(t, game.MessageTypeStartTutorial)
+	}
+
+	post(t, addr, "/performances/tonight/begin", nil)
+	var states []*game.State
+	for _, p := range players {
+		m := p.await(t, game.MessageTypeState)
+		state, err := game.StateFromBytes(m.Data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		states = append(states, state)
+	}
+	post(t, addr, "/performances/tonight/advance", nil)
+	for _, p := range players {
+		p.await(t, game.MessageTypeAssignment)
+	}
+	disklavier.await(t, game.MessageTypeBroadcastPhase) // Lobby
+	disklavier.await(t, game.MessageTypeBroadcastPhase) // Hero
+
+	for i, f := range fingerprints {
+		if me := states[i].Players[game.PlayerID(f)]; me == nil || me.Fingerprint != game.PlayerID(f) {
+			t.Errorf("player %d is not in its own state by its id: %+v", i, states[i].Players)
+		}
+	}
+	for name, s := range map[string]*socket{"disklavier": disklavier, "player 0": players[0], "player 1": players[1]} {
+		for _, frame := range s.frames {
+			for i, f := range fingerprints {
+				if bytes.Contains(frame, []byte(f)) {
+					m, _ := game.MessageFromBytes(frame)
+					t.Errorf("the %s socket was told player %d's fingerprint in a %s", name, i, m.Type)
+				}
+			}
+		}
+	}
+}
+
+// A socket message is bounded by the largest one the protocol has: a
+// player's part at its cap, from the longest fingerprint, read whole;
+// one past that closes the socket rather than being read into memory.
+// The bound used to be 8 MiB on every socket — a hundred times any
+// part, on sockets anyone may open.
+func TestSocketMessagesAreBoundedByTheProtocol(t *testing.T) {
+	addr := runServer(t)
+
+	f := strings.Repeat("ab", maxFingerprintBytes/2)
+	largest := game.NewMessage(game.MessageTypeSubmitPartialTrack, f, make([]byte, maxPartBytes)).Bytes()
+	if len(largest) > maxPlayerMessageBytes {
+		t.Fatalf("the largest part a player sends is %d bytes on the wire, over the %d-byte limit", len(largest), maxPlayerMessageBytes)
+	}
+	p := dial(t, addr, "/ws?fingerprint="+f)
+	p.write(t, largest)
+	p.send(t, game.MessageTypeJoin, game.JoinMessage{NoteCapacity: 1}.Bytes())
+	p.await(t, game.MessageTypeState)
+
+	p.write(t, game.NewMessage(game.MessageTypeSubmitPartialTrack, f, make([]byte, maxPlayerMessageBytes)).Bytes())
+	p.send(t, game.MessageTypeJoin, game.JoinMessage{NoteCapacity: 1}.Bytes())
+	p.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	_, bs, err := p.conn.ReadMessage()
+	if err == nil {
+		m, _ := game.MessageFromBytes(bs)
+		t.Fatalf("a message past the limit was read, and the socket answered with a %s", m.Type)
+	}
+	if !websocket.IsCloseError(err, websocket.CloseMessageTooBig) {
+		t.Errorf("a message past the limit: %v, want the socket closed as too big", err)
+	}
+
+	// The conductor's socket can begin a performance, whose
+	// configuration carries a whole score, so it takes what scheduling
+	// one does.
+	c := dial(t, addr, "/controller-ws?role=conductor")
+	c.await(t, game.MessageTypeState)
+	conf := &game.Configuration{PerformanceID: "big", Title: "Big", Composer: "Somebody", Score: make([]byte, 1<<20)}
+	c.send(t, game.MessageTypeBeginPerformance, conf.Bytes())
+	m := c.await(t, game.MessageTypeState)
+	if state, err := game.StateFromBytes(m.Data); err != nil || state.Configuration == nil || state.Configuration.PerformanceID != "big" {
+		t.Errorf("the conductor's begin with a 1 MiB score: state %+v, %v", state, err)
 	}
 }

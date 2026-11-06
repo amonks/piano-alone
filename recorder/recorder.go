@@ -10,6 +10,11 @@ import (
 	"gitlab.com/gomidi/midi/v2/smf"
 )
 
+// Channel is the MIDI channel (zero-based) a player's keys are played
+// and recorded on. The server takes a part's notes on this channel
+// alone, so the page and the server have to agree on it.
+const Channel = 1
+
 // Recorder records notes into a MIDI SMF file.
 type Recorder struct {
 	bpm      float64

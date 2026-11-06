@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +14,9 @@ import (
 	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/smf"
 
+	"monks.co/piano-alone/abstrack"
 	"monks.co/piano-alone/game"
+	"monks.co/piano-alone/recorder"
 )
 
 // loopServer is a server whose game loop a test drives one message at
@@ -50,8 +53,8 @@ func partOf(t *testing.T, key uint8, size int) []byte {
 	t.Helper()
 	var tr smf.Track
 	tr.Add(0, smf.MetaTempo(120))
-	tr.Add(0, midi.NoteOn(0, key, 100))
-	tr.Add(120, midi.NoteOff(0, key))
+	tr.Add(0, midi.NoteOn(recorder.Channel, key, 100))
+	tr.Add(120, midi.NoteOff(recorder.Channel, key))
 	if size > 0 {
 		tr.Add(0, smf.MetaText(strings.Repeat("x", size)))
 	}
@@ -75,6 +78,7 @@ func partOf(t *testing.T, key uint8, size int) []byte {
 func TestPartsAreTakenOnlyInHeroFromPlayers(t *testing.T) {
 	s := loopServer(t)
 	s.join(t, "player")
+	s.player("player").AssignedNotes = []uint8{60}
 	for _, phase := range []game.Phase{game.GamePhaseUninitialized, game.GamePhaseLobby, game.GamePhaseProcessing, game.GamePhasePlayback, game.GamePhaseDone} {
 		s.state.Phase = phase
 		s.receive(t, game.MessageTypeSubmitPartialTrack, "player", part(t, 0))
@@ -144,6 +148,7 @@ func TestAPerformanceHoldsBoundedPlayersAndParts(t *testing.T) {
 	}
 
 	s.state.Phase = game.GamePhaseHero
+	s.player("p0").AssignedNotes = []uint8{60}
 	s.receive(t, game.MessageTypeSubmitPartialTrack, "p0", part(t, maxPartBytes))
 	if len(s.partials) != 0 {
 		t.Error("a part over the per-part cap was taken")
@@ -210,6 +215,7 @@ func TestPartsTheMergeCannotTakeAreRefused(t *testing.T) {
 	} {
 		s := loopServer(t)
 		s.join(t, "a")
+		s.player("a").AssignedNotes = []uint8{61, 62}
 		s.state.Phase = game.GamePhaseHero
 		s.receive(t, game.MessageTypeSubmitPartialTrack, "a", bad)
 		if len(s.partials) != 0 || s.player("a").HasSubmitted {
@@ -274,6 +280,8 @@ func TestTheRenditionMergesThePartsTaken(t *testing.T) {
 	s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
 	s.join(t, "a")
 	s.join(t, "b")
+	s.player("a").AssignedNotes = []uint8{60}
+	s.player("b").AssignedNotes = []uint8{64}
 	s.state.Phase = game.GamePhaseHero
 	s.receive(t, game.MessageTypeSubmitPartialTrack, "a", partOf(t, 60, 0))
 	s.receive(t, game.MessageTypeSubmitPartialTrack, "b", partOf(t, 64, 0))
@@ -356,5 +364,189 @@ func TestACompletedPerformanceIsNotBegunAgain(t *testing.T) {
 	}
 	if s.player("a") == nil {
 		t.Error("the refused begin cleared the room")
+	}
+}
+
+// partPlaying is a part shaped as the player's recorder makes one, its
+// tempo first, then each key struck and released — and then whatever
+// else a rewritten page might put in it.
+func partPlaying(t *testing.T, keys []uint8, extra ...midi.Message) []byte {
+	t.Helper()
+	var tr smf.Track
+	tr.Add(0, smf.MetaTempo(120))
+	for _, key := range keys {
+		tr.Add(0, midi.NoteOn(recorder.Channel, key, 100))
+		tr.Add(120, midi.NoteOff(recorder.Channel, key))
+	}
+	for _, m := range extra {
+		tr.Add(10, m)
+	}
+	tr.Close(0)
+	f := smf.New()
+	if err := f.Add(tr); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	if _, err := f.WriteTo(&b); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+// A part is the player's recording of the keys they were dealt, sent
+// from a page anyone can rewrite, so the rendition takes from it the
+// dealt keys alone — their strikes and releases, on the channel the
+// recorder plays them on. A part used to be merged whole: any player
+// could add any key to the rendition, on any channel, or anything else
+// MIDI carries (a held pedal, a program change) for the disklavier to
+// play. A player dealt nothing has no part to give.
+func TestARenditionPlaysOnlyTheNotesDealt(t *testing.T) {
+	s := loopServer(t)
+	conf := &game.Configuration{PerformanceID: "tonight", Title: "Tonight", Composer: "Somebody", Score: partOf(t, 60, 0)}
+	if err := s.db.SchedulePerformance(t.Context(), &game.Performance{Configuration: conf}); err != nil {
+		t.Fatal(err)
+	}
+	s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
+	for _, f := range []string{"a", "b", "late"} {
+		s.join(t, f)
+	}
+	s.player("a").AssignedNotes = []uint8{60}
+	s.player("b").AssignedNotes = []uint8{64, 67}
+	s.state.Phase = game.GamePhaseHero
+
+	s.receive(t, game.MessageTypeSubmitPartialTrack, "a", partPlaying(t, []uint8{60, 61, 64},
+		midi.ControlChange(1, 64, 127), midi.ProgramChange(1, 40),
+		midi.NoteOn(9, 60, 127), midi.NoteOff(9, 60)))
+	s.receive(t, game.MessageTypeSubmitPartialTrack, "b", partPlaying(t, []uint8{67}))
+	s.receive(t, game.MessageTypeSubmitPartialTrack, "late", partPlaying(t, []uint8{62}))
+	if _, ok := s.partials["late"]; ok || s.player("late").HasSubmitted {
+		t.Error("a part was taken from a player dealt no notes")
+	}
+	s.receive(t, game.MessageTypeAdvancePhase, roleConductor, nil)
+
+	saved, err := s.db.GetMIDIFile(t.Context(), "tonight")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendition, err := smf.ReadFrom(bytes.NewReader(saved))
+	if err != nil {
+		t.Fatalf("the saved rendition does not parse: %v", err)
+	}
+	played := map[uint8]bool{}
+	for _, tr := range rendition.Tracks {
+		for _, ev := range tr {
+			var ch, key, vel uint8
+			var bpm float64
+			switch {
+			case ev.Message.GetNoteStart(&ch, &key, &vel):
+				played[key] = true
+				if ch != recorder.Channel {
+					t.Errorf("the rendition strikes %d on channel %d", key, ch)
+				}
+			case ev.Message.GetNoteEnd(&ch, &key):
+				if ch != recorder.Channel {
+					t.Errorf("the rendition releases %d on channel %d", key, ch)
+				}
+			case ev.Message.GetMetaTempo(&bpm), ev.Message.Is(smf.MetaEndOfTrackMsg):
+			default:
+				t.Errorf("the rendition carries a %s from a part", ev.Message)
+			}
+		}
+	}
+	if len(played) != 2 || !played[60] || !played[67] {
+		t.Errorf("the rendition plays %v, want the dealt keys that were played: 60 and 67", played)
+	}
+}
+
+// A part's tempo times that part's notes and nobody else's. Each part
+// is read into absolute time at its own tempo before the merge, and
+// the rendition is written back to ticks at one tempo of its own — so
+// a player whose part declares an extreme tempo, which a rewritten
+// page can, cannot shift when anyone else's keys sound. The parts'
+// tempos used to be merged into the rendition, and the last one seen
+// set the ticks every later note was written in: rounded to a coarse
+// tick, or overflowing one, which cut seconds out of a rest.
+func TestAPartsTempoMovesNoOneElsesNotes(t *testing.T) {
+	// a's part: 60 struck at half a second, and again after a twelve
+	// second rest, at the recorder's 120 bpm and 960 ticks a beat.
+	var tr smf.Track
+	tr.Add(0, smf.MetaTempo(120))
+	tr.Add(960, midi.NoteOn(recorder.Channel, 60, 100))
+	tr.Add(960, midi.NoteOff(recorder.Channel, 60))
+	tr.Add(24*960, midi.NoteOn(recorder.Channel, 60, 100))
+	tr.Add(960, midi.NoteOff(recorder.Channel, 60))
+	tr.Close(0)
+	f := smf.New()
+	if err := f.Add(tr); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	if _, err := f.WriteTo(&b); err != nil {
+		t.Fatal(err)
+	}
+	aPart := b.Bytes()
+
+	// When a's notes sound in the rendition, beside b's part.
+	timesBeside := func(bPart []byte) []time.Duration {
+		s := loopServer(t)
+		conf := &game.Configuration{PerformanceID: "tonight", Title: "Tonight", Composer: "Somebody", Score: partOf(t, 60, 0)}
+		if err := s.db.SchedulePerformance(t.Context(), &game.Performance{Configuration: conf}); err != nil {
+			t.Fatal(err)
+		}
+		s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
+		s.join(t, "a")
+		s.join(t, "b")
+		s.player("a").AssignedNotes = []uint8{60}
+		s.player("b").AssignedNotes = []uint8{64}
+		s.state.Phase = game.GamePhaseHero
+		s.receive(t, game.MessageTypeSubmitPartialTrack, "a", aPart)
+		s.receive(t, game.MessageTypeSubmitPartialTrack, "b", bPart)
+		if len(s.partials) != 2 {
+			t.Fatalf("%d parts taken, want both", len(s.partials))
+		}
+		s.receive(t, game.MessageTypeAdvancePhase, roleConductor, nil)
+		saved, err := s.db.GetMIDIFile(t.Context(), "tonight")
+		if err != nil {
+			t.Fatal(err)
+		}
+		rendition, err := smf.ReadFrom(bytes.NewReader(saved))
+		if err != nil {
+			t.Fatalf("the saved rendition does not parse: %v", err)
+		}
+		var times []time.Duration
+		for _, ev := range abstrack.FromSMF(rendition, 0).Events {
+			var ch, key, vel uint8
+			if (ev.Message.GetNoteStart(&ch, &key, &vel) || ev.Message.GetNoteEnd(&ch, &key)) && key == 60 {
+				times = append(times, ev.Timestamp)
+			}
+		}
+		return times
+	}
+
+	want := timesBeside(partOf(t, 64, 0))
+	if len(want) != 4 {
+		t.Fatalf("a's notes beside an ordinary part: %v", want)
+	}
+	// b's part sets the recorder's tempo, as checkPart wants, and then
+	// changes it: from then on, the last tempo the merge saw set the
+	// ticks every later note in the rendition was written in.
+	for _, bpm := range []float64{60_000_000, 3.58} {
+		var tr smf.Track
+		tr.Add(0, smf.MetaTempo(120))
+		tr.Add(0, midi.NoteOn(recorder.Channel, 64, 100))
+		tr.Add(1, smf.MetaTempo(bpm))
+		tr.Add(0, midi.NoteOff(recorder.Channel, 64))
+		tr.Close(0)
+		f := smf.New()
+		if err := f.Add(tr); err != nil {
+			t.Fatal(err)
+		}
+		var b bytes.Buffer
+		if _, err := f.WriteTo(&b); err != nil {
+			t.Fatal(err)
+		}
+		if got := timesBeside(b.Bytes()); !slices.Equal(got, want) {
+			t.Errorf("beside a part at %v bpm, a's notes sound at %v, want %v", bpm, got, want)
+		}
 	}
 }

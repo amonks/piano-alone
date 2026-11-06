@@ -22,16 +22,28 @@ import (
 	"monks.co/piano-alone/templates"
 )
 
-// Request-body limits. A performance carries a whole MIDI score and a
-// socket message carries a player's recorded part, so these are
-// generous — they are here to bound what an anonymous caller can make
-// the server allocate, not to police the piece.
+// Request-body limits, which bound what a caller can make the server
+// allocate.
 const (
-	maxPerformanceBytes   = 8 << 20
-	maxSocketMessageBytes = 8 << 20
+	// maxPerformanceBytes bounds a performance being scheduled, which
+	// carries a whole MIDI score (the piece's are under 20 KB).
+	maxPerformanceBytes = 8 << 20
 
-	// maxFingerprintBytes bounds the key a player is held under: the
-	// player's own fingerprint is 128 random bytes in hex.
+	// The largest message a player's socket sends is its part, and the
+	// conductor's is a configuration it begins, which carries a whole
+	// score; everything else any socket sends is a few bytes. Around
+	// either is gob's envelope: the Message type's definition, which
+	// every message carries since each is encoded alone, and the
+	// Player field, where the page puts its fingerprint (at most
+	// maxFingerprintBytes). That is under 400 bytes; envelopeBytes
+	// leaves room to spare. A message past its socket's limit closes
+	// the socket rather than being read into memory.
+	envelopeBytes            = 1 << 10
+	maxPlayerMessageBytes    = maxPartBytes + envelopeBytes
+	maxConductorMessageBytes = maxPerformanceBytes + envelopeBytes
+
+	// maxFingerprintBytes bounds what a player's socket presents: the
+	// page's own fingerprint is 128 random bytes in hex.
 	maxFingerprintBytes = 256
 )
 
@@ -311,21 +323,18 @@ func (s *Server) handlePlayerWebsocket(w http.ResponseWriter, req *http.Request)
 		http.Error(w, "fingerprint too long", http.StatusBadRequest)
 		return
 	}
-	if fingerprint == roleConductor || fingerprint == roleDisklavier ||
-		fingerprint == fingerprintControllers || fingerprint == fingerprintEveryone {
-		// The routing vocabulary and the fingerprint space share one
-		// namespace, so a player claiming one of these names would be
-		// handed the controllers' messages.
-		http.Error(w, "reserved fingerprint", http.StatusBadRequest)
-		return
-	}
-	s.socket(w, req, fingerprint)
+	// The fingerprint is the player's credential, and it goes no
+	// further than this: from here on the player is its id, in the
+	// game loop, in every message any socket is sent, and in the logs.
+	// An id is a hex digest, so no player can answer to one of the
+	// routing names (roleConductor, toEveryone, …).
+	s.socket(w, req, game.PlayerID(fingerprint))
 }
 
 // socket runs one connection's read loop. origin is who the connection
-// is — a player's fingerprint, or one of the two controller roles —
-// and it is stamped onto every message the connection sends. Nothing a
-// client writes decides who it is: the Player field arrives from the
+// is — a player's id, or one of the two controller roles — and it is
+// stamped onto every message the connection sends. Nothing a client
+// writes decides who it is: the Player field arrives from the
 // internet, and believing it let any socket act as any player.
 func (s *Server) socket(w http.ResponseWriter, req *http.Request, origin string) {
 	conn, err := upgrader.Upgrade(w, req, nil)
@@ -341,7 +350,11 @@ func (s *Server) socket(w http.ResponseWriter, req *http.Request, origin string)
 	s.addConn(ctx, origin, conn)
 	s.log.InfoContext(ctx, "socket opened", "piano.origin", origin)
 
-	conn.SetReadLimit(maxSocketMessageBytes)
+	limit := int64(maxPlayerMessageBytes)
+	if origin == roleConductor {
+		limit = maxConductorMessageBytes
+	}
+	conn.SetReadLimit(limit)
 	for {
 		_, bs, err := conn.ReadMessage()
 		if err != nil {
@@ -390,19 +403,19 @@ func (s *Server) fromClient(ctx context.Context, origin string, m *game.Message)
 	return s.send(ctx, m)
 }
 
-func (s *Server) addConn(ctx context.Context, fingerprint string, conn *websocket.Conn) {
+func (s *Server) addConn(ctx context.Context, origin string, conn *websocket.Conn) {
 	s.connMu.Lock()
-	switch fingerprint {
+	switch origin {
 	case roleDisklavier:
 		s.disklavierConn = conn
 	case roleConductor:
 		s.conductorConn = conn
 	default:
-		s.conns[fingerprint] = conn
+		s.conns[origin] = conn
 	}
 	s.connMu.Unlock()
 
-	switch fingerprint {
+	switch origin {
 	case roleDisklavier:
 		s.send(ctx, game.NewMessage(game.MessageTypeDisklavierConnected, roleDisklavier, nil))
 	case roleConductor:
@@ -413,7 +426,7 @@ func (s *Server) addConn(ctx context.Context, fingerprint string, conn *websocke
 // removeConn clears a slot only if it still holds the connection that
 // is leaving. A reconnect — a page refresh mid-performance — registers
 // the new socket before the old one's read loop notices it is closed,
-// and a delete keyed on the fingerprint alone would take the new
+// and a delete keyed on the id alone would take the new
 // socket out of the registry: the player would stay connected and
 // receive nothing, no assignment and no phase changes, while the
 // server thought it had already told them.
@@ -422,10 +435,10 @@ func (s *Server) addConn(ctx context.Context, fingerprint string, conn *websocke
 // reason plus one: an impostor who grabs the disklavier slot and drops
 // it would otherwise nil out whatever conn is registered by then,
 // including a real disklavier that reconnected in between.
-func (s *Server) removeConn(ctx context.Context, fingerprint string, conn *websocket.Conn) {
+func (s *Server) removeConn(ctx context.Context, origin string, conn *websocket.Conn) {
 	s.connMu.Lock()
 	var current *websocket.Conn
-	switch fingerprint {
+	switch origin {
 	case roleDisklavier:
 		if current = s.disklavierConn; current == conn {
 			s.disklavierConn = nil
@@ -435,8 +448,8 @@ func (s *Server) removeConn(ctx context.Context, fingerprint string, conn *webso
 			s.conductorConn = nil
 		}
 	default:
-		if current = s.conns[fingerprint]; current == conn {
-			delete(s.conns, fingerprint)
+		if current = s.conns[origin]; current == conn {
+			delete(s.conns, origin)
 		}
 	}
 	s.connMu.Unlock()
@@ -453,8 +466,8 @@ func (s *Server) removeConn(ctx context.Context, fingerprint string, conn *webso
 	// its handler returns — which it cannot do while parked here. The
 	// game loop is already stopped in that case, so the message it
 	// would have received has nowhere to be useful.
-	msg := game.NewMessage(game.MessageTypeLeave, fingerprint, nil)
-	switch fingerprint {
+	msg := game.NewMessage(game.MessageTypeLeave, origin, nil)
+	switch origin {
 	case roleDisklavier:
 		msg = game.NewMessage(game.MessageTypeDisklavierDisconnected, roleDisklavier, nil)
 	case roleConductor:
@@ -466,11 +479,11 @@ func (s *Server) removeConn(ctx context.Context, fingerprint string, conn *webso
 	}
 }
 
-func (s *Server) withConn(fingerprint string, f func(string, *websocket.Conn)) {
+func (s *Server) withConn(to string, f func(string, *websocket.Conn)) {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
-	switch fingerprint {
-	case fingerprintControllers:
+	switch to {
+	case toControllers:
 		if s.disklavierConn != nil {
 			f(roleDisklavier, s.disklavierConn)
 		}
@@ -486,8 +499,8 @@ func (s *Server) withConn(fingerprint string, f func(string, *websocket.Conn)) {
 			f(roleConductor, s.conductorConn)
 		}
 	default:
-		if c, ok := s.conns[fingerprint]; ok {
-			f(fingerprint, c)
+		if c, ok := s.conns[to]; ok {
+			f(to, c)
 		}
 	}
 }
@@ -501,7 +514,7 @@ func (s *Server) eachConn(f func(string, *websocket.Conn)) {
 	if s.conductorConn != nil {
 		f(roleConductor, s.conductorConn)
 	}
-	for fingerprint, sock := range s.conns {
-		f(fingerprint, sock)
+	for id, sock := range s.conns {
+		f(id, sock)
 	}
 }

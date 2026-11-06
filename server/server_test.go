@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -182,17 +181,21 @@ func TestConductorMessagesReachTheLoop(t *testing.T) {
 	})
 }
 
-// TestReservedFingerprintsAreRefused: the routing vocabulary and the
-// fingerprint space are one namespace, so a player answering to
-// "conductor" would be handed the controllers' messages.
-func TestReservedFingerprintsAreRefused(t *testing.T) {
+// A player is addressed by its id, never by the fingerprint its
+// socket presents, and an id is a hex digest — so the routing names
+// and the players' ids are two namespaces, and a player whose
+// fingerprint is "conductor" is not handed the controllers' messages.
+func TestNoFingerprintNamesARoute(t *testing.T) {
 	s := newTestServer(t)
-	for _, fingerprint := range []string{roleConductor, roleDisklavier, fingerprintControllers, fingerprintEveryone, ""} {
-		req := httptest.NewRequest("GET", "/ws?fingerprint="+url.QueryEscape(fingerprint), nil)
-		w := httptest.NewRecorder()
-		s.Handler().ServeHTTP(w, req)
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("fingerprint %q got %d, want 400", fingerprint, w.Code)
+	req := httptest.NewRequest("GET", "/ws?fingerprint=", nil)
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("no fingerprint got %d, want 400", w.Code)
+	}
+	for _, route := range []string{roleConductor, roleDisklavier, toControllers, toEveryone} {
+		if id := game.PlayerID(route); id == roleConductor || id == roleDisklavier || id == toControllers || id == toEveryone {
+			t.Errorf("a player whose fingerprint is %q is addressed as %q", route, id)
 		}
 	}
 }

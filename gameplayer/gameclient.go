@@ -42,9 +42,13 @@ var (
 )
 
 type GameClient struct {
-	loopback            chan<- message
-	send                chan<- *game.Message
-	fingerprint         string
+	loopback    chan<- message
+	send        chan<- *game.Message
+	fingerprint string
+	// id is how the server names this player to everyone, this page
+	// included: the state holds players by id (game.PlayerID), never
+	// by the fingerprint that is this page's credential.
+	id                  string
 	state               *game.State
 	pianoAnimationReady bool
 	myScore             *Score
@@ -59,6 +63,7 @@ type GameClient struct {
 func New(fingerprint string, root js.Value) *GameClient {
 	return &GameClient{
 		fingerprint: fingerprint,
+		id:          game.PlayerID(fingerprint),
 	}
 }
 
@@ -189,15 +194,15 @@ func (c *GameClient) handleMessage(m message) error {
 
 			hide(overlay, "1s")
 
-			c.piano.HideInactiveKeys(c.state.Players[c.fingerprint].AssignedNotes, time.Second*2)
+			c.piano.HideInactiveKeys(c.state.Players[c.id].AssignedNotes, time.Second*2)
 			time.Sleep(time.Second * 3)
 			c.piano.Morph(time.Second, func(on bool, noteno uint8) {
 				now := time.Now()
 				var msg midi.Message
 				if on {
-					msg = midi.NoteOn(1, noteno, 100)
+					msg = midi.NoteOn(recorder.Channel, noteno, 100)
 				} else {
-					msg = midi.NoteOff(1, noteno)
+					msg = midi.NoteOff(recorder.Channel, noteno)
 				}
 				c.loopback <- msgKey{Timestamp: now, Message: msg}
 			})
@@ -216,7 +221,7 @@ func (c *GameClient) handleMessage(m message) error {
 		return nil
 
 	case msgShowClickthrough:
-		hasCompletedTutorial := c.state.Players[c.fingerprint].HasCompletedTutorial
+		hasCompletedTutorial := c.state.Players[c.id].HasCompletedTutorial
 		go func() {
 			var handler js.Func
 			handler = js.FuncOf(func(_ js.Value, args []js.Value) any {
@@ -251,7 +256,7 @@ func (c *GameClient) handleMessage(m message) error {
 		return nil
 
 	case msgStartHeroIntro:
-		keys := c.state.Players[c.fingerprint].AssignedNotes
+		keys := c.state.Players[c.id].AssignedNotes
 		go func() {
 			c.send <- game.NewMessage(game.MessageTypeStartTutorial, c.fingerprint, nil)
 
@@ -283,15 +288,15 @@ func (c *GameClient) handleMessage(m message) error {
 				now := time.Now()
 				var msg midi.Message
 				if on {
-					msg = midi.NoteOn(1, noteno, 100)
+					msg = midi.NoteOn(recorder.Channel, noteno, 100)
 				} else {
-					msg = midi.NoteOff(1, noteno)
+					msg = midi.NoteOff(recorder.Channel, noteno)
 				}
 				c.loopback <- msgKey{Timestamp: now, Message: msg}
 			})
 			time.Sleep(time.Second * 4)
 
-			if len(c.state.Players[c.fingerprint].AssignedNotes) > 1 {
+			if len(c.state.Players[c.id].AssignedNotes) > 1 {
 				overlay.Set("innerText", "Focus on these keys here.")
 			} else {
 				overlay.Set("innerText", "Focus on this key here.")
@@ -301,7 +306,7 @@ func (c *GameClient) handleMessage(m message) error {
 			hide(overlay, "0.5s")
 			time.Sleep(time.Second)
 
-			if len(c.state.Players[c.fingerprint].AssignedNotes) > 1 {
+			if len(c.state.Players[c.id].AssignedNotes) > 1 {
 				overlay.Set("innerText", "Notes will fall down towards the keys.")
 			} else {
 				overlay.Set("innerText", "Notes will fall down towards the key.")
@@ -444,7 +449,7 @@ func (c *GameClient) handleMessage(m message) error {
 			// A state that arrives before this player is in it — a
 			// late join, a restart — leaves them unassigned, which is
 			// the same case as joining with no notes yet.
-			me := c.state.Players[c.fingerprint]
+			me := c.state.Players[c.id]
 			hasAssignment := me != nil && len(me.AssignedNotes) > 0
 
 			switch c.state.Phase {
@@ -534,7 +539,7 @@ func (c *GameClient) handleMessage(m message) error {
 }
 
 func (c *GameClient) setUpScore(notes []uint8) error {
-	me := c.state.Players[c.fingerprint]
+	me := c.state.Players[c.id]
 	me.AssignedNotes = notes
 	r := bytes.NewReader(c.state.Configuration.Score)
 	smf, err := smf.ReadFrom(r)

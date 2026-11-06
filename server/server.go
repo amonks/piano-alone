@@ -29,17 +29,18 @@ import (
 	"monks.co/piano-alone/game"
 )
 
-// The two controller roles, which are also the fingerprints the game
-// loop addresses them by.
+// The two controller roles, which are also the names the game loop
+// addresses them by beside the players' ids, and the two names that
+// address more than one socket.
 const (
 	roleConductor  = "conductor"
 	roleDisklavier = "disklavier"
 
-	// fingerprintControllers addresses both controllers at once.
-	fingerprintControllers = "controllers"
+	// toControllers addresses both controllers at once.
+	toControllers = "controllers"
 
-	// fingerprintEveryone broadcasts.
-	fingerprintEveryone = "*"
+	// toEveryone broadcasts.
+	toEveryone = "*"
 )
 
 const defaultDBPath = "piano-alone.db"
@@ -68,7 +69,7 @@ type Server struct {
 	// finished rendition is written down — so a restart mid-performance
 	// loses everything in flight.
 	state *game.State
-	// partials are the parts players have submitted, by fingerprint, as
+	// partials are the parts players have submitted, by id, as
 	// the bytes each sent.
 	partials               map[string][]byte
 	sentSwitchToVideoModal bool
@@ -212,16 +213,16 @@ func (s *Server) deliver(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case m := <-s.outbox:
-			if m.Player == fingerprintEveryone {
-				s.eachConn(func(fingerprint string, sock *websocket.Conn) {
-					s.write(ctx, fingerprint, sock, m)
+			if m.Player == toEveryone {
+				s.eachConn(func(id string, sock *websocket.Conn) {
+					s.write(ctx, id, sock, m)
 				})
 				continue
 			}
 			delivered := false
-			s.withConn(m.Player, func(fingerprint string, conn *websocket.Conn) {
+			s.withConn(m.Player, func(id string, conn *websocket.Conn) {
 				delivered = true
-				s.write(ctx, fingerprint, conn, m)
+				s.write(ctx, id, conn, m)
 			})
 			if !delivered {
 				s.log.DebugContext(ctx, "dropping message for absent recipient",
@@ -240,12 +241,12 @@ func (s *Server) deliver(ctx context.Context) {
 // everyone's.
 const writeTimeout = 10 * time.Second
 
-func (s *Server) write(ctx context.Context, fingerprint string, conn *websocket.Conn, m *game.Message) {
+func (s *Server) write(ctx context.Context, id string, conn *websocket.Conn, m *game.Message) {
 	conn.SetWriteDeadline(time.Now().Add(writeTimeout))
 	if err := conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
 		s.log.WarnContext(ctx, "websocket write failed",
 			"piano.message_type", m.Type.String(),
-			"piano.recipient", fingerprint,
+			"piano.recipient", id,
 			"error.message", err.Error(),
 			"error.type", fmt.Sprintf("%T", err))
 		conn.Close()
