@@ -259,6 +259,51 @@ func TestRenditionsPlayedAtTwiceTheirSpeedAreCorrected(t *testing.T) {
 	check("after correcting again")
 }
 
+// TestTheDebussyIsTitledByItsExcerpt: the Debussy performance was
+// titled "(first 4 seconds)", but its score is the first 5.25 seconds of
+// the Prelude. The title is corrected; any other performance, and the
+// Debussy if it has already been retitled, is left alone.
+func TestTheDebussyIsTitledByItsExcerpt(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "performances.db")
+	handle, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handle.Close()
+	if _, err := handle.Exec(legacySchema); err != nil {
+		t.Fatal(err)
+	}
+	rows := []struct{ id, title, composer string }{
+		{"debussy", "Prelude (from Suite Bergamasque) (first 4 seconds)", "Claude Debussy"},
+		{"rachmaninoff", "Prelude in C♯ Minor", "Sergei Rachmaninoff"},
+		{"other", "Prelude (from Suite Bergamasque) (first 4 seconds)", "Somebody Else"},
+	}
+	for _, r := range rows {
+		if _, err := handle.Exec(
+			"INSERT INTO performances (id, title, composer, score, date, is_featured, is_complete, rendition, player_count) VALUES (?,?,?,?,?,?,?,?,?)",
+			r.id, r.title, r.composer, []byte("score"), "2024-06-11 21:30:00-05:00", 1, 0, nil, 6); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Migrate(t.Context(), handle); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"debussy":      "Prelude (from Suite Bergamasque) (first 5 seconds)",
+		"rachmaninoff": "Prelude in C♯ Minor",
+		"other":        "Prelude (from Suite Bergamasque) (first 4 seconds)",
+	}
+	for id, w := range want {
+		var got string
+		if err := handle.QueryRow("SELECT title FROM performances WHERE id = ?", id).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		if got != w {
+			t.Errorf("%s is titled %q, want %q", id, got, w)
+		}
+	}
+}
+
 func TestRenditionRoundTrip(t *testing.T) {
 	store := openFresh(t)
 	perf := &game.Performance{
