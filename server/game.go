@@ -371,24 +371,30 @@ func checkPart(bs []byte) error {
 
 // mergePart merges what one part's bytes may contribute — the keys
 // dealt, by onlyDealt, within what a page can record by end, by
-// bounded — into track, and reports how many of the part's events
-// bounded left out. A panic in the merge's asserted invariants is an
-// error.
-func mergePart(track *abstrack.AbsTrack, bs []byte, dealt []uint8, end time.Duration) (merged *abstrack.AbsTrack, dropped int, err error) {
+// bounded — into track, and reports how many strikes that kept and how
+// many of the part's events bounded left out. A panic in the merge's
+// asserted invariants is an error.
+func mergePart(track *abstrack.AbsTrack, bs []byte, dealt []uint8, end time.Duration) (merged *abstrack.AbsTrack, strikes, dropped int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			merged, dropped, err = nil, 0, fmt.Errorf("merging: %v", r)
+			merged, strikes, dropped, err = nil, 0, 0, fmt.Errorf("merging: %v", r)
 		}
 	}()
 	if err := checkPart(bs); err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	f, err := readPart(bs)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, 0, err
 	}
 	part, dropped := bounded(onlyDealt(abstrack.FromSMF(f, 0), dealt), end)
-	return track.Merge(part), dropped, nil
+	for _, ev := range part.Events {
+		var channel, key, velocity uint8
+		if ev.Message.GetNoteStart(&channel, &key, &velocity) {
+			strikes++
+		}
+	}
+	return track.Merge(part), strikes, dropped, nil
 }
 
 // bounded holds a part, as onlyDealt leaves it, to what the page can
@@ -595,6 +601,7 @@ func (s *Server) assemble(ctx context.Context) error {
 		}
 		end += length
 	}
+	strikes := 0
 	for id, bs := range s.partials {
 		// Read again here rather than kept parsed since it was taken: a
 		// parsed SMF is several times its bytes. checkPart passed it
@@ -606,7 +613,7 @@ func (s *Server) assemble(ctx context.Context) error {
 		if player := s.player(id); player != nil {
 			dealt = player.AssignedNotes
 		}
-		merged, dropped, err := mergePart(track, bs, dealt, end)
+		withPart, struck, dropped, err := mergePart(track, bs, dealt, end)
 		if err != nil {
 			s.log.ErrorContext(ctx, "leaving a part out of the rendition",
 				"piano.player", id,
@@ -619,7 +626,23 @@ func (s *Server) assemble(ctx context.Context) error {
 				"piano.player", id,
 				"piano.dropped_events", dropped)
 		}
-		track = merged
+		track = withPart
+		strikes += struck
+	}
+	if strikes == 0 {
+		// Nothing was played — no part was submitted, none could be
+		// merged, or every one merged holds no strike of a dealt key,
+		// which is what the page sends when its player pressed nothing,
+		// since it submits on a timer — so there is nothing to keep, and
+		// a rendition is written once: an empty one would complete the
+		// performance, taking it off the conductor's picker and refusing
+		// it a second beginning, with nothing in it. It stays scheduled,
+		// and the disklavier is sent nothing.
+		s.state.Rendition = nil
+		s.log.WarnContext(ctx, "nothing played: writing no rendition",
+			"piano.parts", len(s.partials))
+		s.setPhase(ctx, game.GamePhasePlayback)
+		return nil
 	}
 	file := smf.New()
 	file.Add(track.ToSMF())

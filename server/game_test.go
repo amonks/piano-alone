@@ -692,3 +692,67 @@ func TestAPartIsBoundedInTimeAndDensity(t *testing.T) {
 		t.Errorf("the last key the rendition moves is %d, want 62, released where the longer part ends", lastKey)
 	}
 }
+
+// A rendition is what an audience played, written once. When no part
+// holds a strike of a dealt key — nobody submitted one, none could be
+// taken, or every player pressed nothing, which still sends a part,
+// since the page submits on a timer — nothing was played, and nothing
+// is written: the performance stays scheduled, so the conductor can
+// begin it again, and the disklavier is sent nothing. Written, an
+// empty rendition would complete the performance: off the conductor's
+// picker, and refused a second beginning, with nothing in it.
+func TestAPerformanceWithNoPartsWritesNoRendition(t *testing.T) {
+	for name, plant := range map[string]func(s *Server){
+		"no part submitted":       func(*Server) {},
+		"no part could be merged": func(s *Server) { s.partials["a"] = []byte("not MIDI") },
+		// What the page sends when its player pressed nothing: it
+		// submits on a timer, so a quiet room still sends every part.
+		"every part is empty": func(s *Server) {
+			r := recorder.New(120)
+			r.Close()
+			bs, err := r.Bytes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			s.partials["a"] = bs
+		},
+		"no part plays a dealt key": func(s *Server) { s.partials["a"] = partPlaying(t, []uint8{61}) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			s := loopServer(t)
+			conf := &game.Configuration{PerformanceID: "quiet", Title: "Quiet", Composer: "Somebody", Score: partOf(t, 60, 0)}
+			if err := s.db.SchedulePerformance(t.Context(), &game.Performance{Configuration: conf}); err != nil {
+				t.Fatal(err)
+			}
+			s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
+			s.join(t, "a")
+			s.player("a").AssignedNotes = []uint8{60}
+			s.state.Phase = game.GamePhaseHero
+			plant(s)
+			drainOutbox(s)
+			s.receive(t, game.MessageTypeAdvancePhase, roleConductor, nil)
+
+			if s.state.Phase != game.GamePhasePlayback {
+				t.Errorf("phase after assembly = %s", s.state.Phase)
+			}
+			if s.state.Rendition != nil {
+				t.Errorf("a rendition of %d bytes is held", len(s.state.Rendition))
+			}
+			if complete, err := s.db.IsComplete(t.Context(), "quiet"); err != nil || complete {
+				t.Errorf("the performance is complete (%v, %v), want it still scheduled", complete, err)
+			}
+			if saved, err := s.db.GetMIDIFile(t.Context(), "quiet"); err != nil || len(saved) != 0 {
+				t.Errorf("a rendition of %d bytes was saved (%v)", len(saved), err)
+			}
+			for _, m := range drainOutbox(s) {
+				if m.Type == game.MessageTypeSendRenditionToDisklavier {
+					t.Errorf("the disklavier was sent a rendition of %d bytes", len(m.Data))
+				}
+			}
+			s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
+			if s.state.Phase != game.GamePhaseLobby {
+				t.Errorf("the performance could not be begun again: phase %s", s.state.Phase)
+			}
+		})
+	}
+}
