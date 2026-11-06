@@ -29,6 +29,10 @@ import (
 const (
 	maxPerformanceBytes   = 8 << 20
 	maxSocketMessageBytes = 8 << 20
+
+	// maxFingerprintBytes bounds the key a player is held under: the
+	// player's own fingerprint is 128 random bytes in hex.
+	maxFingerprintBytes = 256
 )
 
 // newMux builds the route table once. It used to be rebuilt on every
@@ -295,6 +299,10 @@ func (s *Server) handlePlayerWebsocket(w http.ResponseWriter, req *http.Request)
 	fingerprint := req.URL.Query().Get("fingerprint")
 	if fingerprint == "" {
 		http.Error(w, "no fingerprint specified", http.StatusBadRequest)
+		return
+	}
+	if len(fingerprint) > maxFingerprintBytes {
+		http.Error(w, "fingerprint too long", http.StatusBadRequest)
 		return
 	}
 	if fingerprint == roleConductor || fingerprint == roleDisklavier ||

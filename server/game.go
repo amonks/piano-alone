@@ -5,11 +5,27 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"time"
 
 	"gitlab.com/gomidi/midi/v2/smf"
 
 	"monks.co/piano-alone/abstrack"
 	"monks.co/piano-alone/game"
+)
+
+// What one performance can hold, whoever opens sockets. The player's
+// socket is public and anonymous, so these bound the memory a stranger
+// can make the server keep — at most maxPlayers parts of maxPartBytes,
+// 16 MiB — and each player's part is bounded on its own, so no socket
+// can crowd out another's. Both are far above anything the piece has
+// played: its two audiences were twelve and six, and its largest
+// rendition, six players' parts merged, is 7 KB.
+const (
+	// maxPlayers is how many fingerprints one performance holds.
+	maxPlayers = 256
+	// maxPartBytes is the largest part a player may submit.
+	maxPartBytes = 64 << 10
 )
 
 // play is the game loop: one goroutine, one state, messages handled
@@ -24,7 +40,7 @@ import (
 // performance in flight.
 func (s *Server) play(ctx context.Context) error {
 	s.state = game.NewState()
-	s.partials = map[string]*smf.SMF{}
+	s.partials = map[string][]byte{}
 
 	for {
 		select {
@@ -74,7 +90,7 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		conf := s.state.Configuration
 		s.state = game.NewState()
 		s.state.Configuration = conf
-		s.partials = map[string]*smf.SMF{}
+		s.partials = map[string][]byte{}
 		s.sentSwitchToVideoModal = false
 		s.broadcast(ctx, game.MessageTypeState, s.state.Bytes())
 		s.log.InfoContext(ctx, "performance restarted")
@@ -85,8 +101,26 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		if err != nil {
 			return err
 		}
+		// A performance begins with the audience in the room and nothing
+		// else of the last one: its parts are not this one's to merge,
+		// whoever has left is forgotten (a reload joins again), and those
+		// still here start with no notes, tutorial, or part.
 		s.state.Phase = game.GamePhaseUninitialized
 		s.state.Configuration = configuration
+		s.state.Rendition = nil
+		for fingerprint, player := range s.state.Players {
+			if player.ConnectionState != game.ConnectionStateConnected {
+				delete(s.state.Players, fingerprint)
+				continue
+			}
+			s.state.Players[fingerprint] = &game.Player{
+				Fingerprint:     fingerprint,
+				NoteCapacity:    player.NoteCapacity,
+				ConnectionState: game.ConnectionStateConnected,
+			}
+		}
+		s.partials = map[string][]byte{}
+		s.sentSwitchToVideoModal = false
 		s.broadcast(ctx, game.MessageTypeState, s.state.Bytes())
 		s.setPhase(ctx, game.GamePhaseLobby)
 		s.log.InfoContext(ctx, "performance begun",
@@ -129,6 +163,14 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		// registered as it.
 		fingerprint := msg.Player
 		if s.player(fingerprint) == nil {
+			if len(s.state.Players) >= maxPlayers && !s.evictLeaver() {
+				// Sent the state all the same: the page waits on it to
+				// know where the performance is.
+				s.log.WarnContext(ctx, "refusing a join: the performance is full",
+					"piano.origin", fingerprint, "piano.players", len(s.state.Players))
+				s.sendTo(ctx, fingerprint, game.MessageTypeState, s.state.Bytes())
+				return nil
+			}
 			s.state.Players[fingerprint] = &game.Player{
 				Fingerprint:  fingerprint,
 				NoteCapacity: joinMessage.NoteCapacity,
@@ -171,15 +213,35 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		return nil
 
 	case game.MessageTypeSubmitPartialTrack:
-		partial, err := smf.ReadFrom(bytes.NewReader(msg.Data))
-		if err != nil {
-			return fmt.Errorf("parsing submitted track: %w", err)
+		// A part is a player's recording of their notes, so it is taken
+		// while the performance is played and from someone in it — and
+		// within the budget, which a resubmission's own last part frees.
+		// Anyone may open a player's socket in any phase, and a part
+		// taken whenever from whoever sat in memory until a Restart and
+		// was merged into the next rendition.
+		player := s.player(msg.Player)
+		var refusal string
+		switch {
+		case s.state.Phase != game.GamePhaseHero:
+			refusal = "outside Hero"
+		case player == nil:
+			refusal = "from a fingerprint that never joined"
+		case len(msg.Data) > maxPartBytes:
+			refusal = fmt.Sprintf("larger than %d bytes", maxPartBytes)
+		default:
+			if err := checkPart(msg.Data); err != nil {
+				refusal = err.Error()
+			}
 		}
-		s.partials[msg.Player] = partial
-		if s.player(msg.Player) == nil {
-			s.state.Players[msg.Player] = &game.Player{Fingerprint: msg.Player}
+		if refusal != "" {
+			s.log.WarnContext(ctx, "refusing a part: "+refusal,
+				"piano.origin", msg.Player,
+				"piano.phase", s.state.Phase.String(),
+				"piano.part_bytes", len(msg.Data))
+			return nil
 		}
-		s.player(msg.Player).HasSubmitted = true
+		s.partials[msg.Player] = msg.Data
+		player.HasSubmitted = true
 		s.sendTo(ctx, fingerprintControllers, game.MessageTypeBroadcastSubmittedTrack, []byte(msg.Player))
 		s.log.InfoContext(ctx, "part submitted",
 			"piano.fingerprint", msg.Player,
@@ -194,6 +256,96 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		s.log.DebugContext(ctx, "not handling message", "piano.message_type", msg.Type.String())
 		return nil
 	}
+}
+
+// evictLeaver makes room in a full roster by forgetting one player who
+// has left holding nothing to come back to — no notes and no part —
+// and reports whether it found one. Every page load joins, so a
+// roster of everyone who ever opened the page fills by itself between
+// performances; a leaver with notes may reload to play them, and keeps
+// their place.
+func (s *Server) evictLeaver() bool {
+	for fingerprint, p := range s.state.Players {
+		if p.ConnectionState != game.ConnectionStateConnected && len(p.AssignedNotes) == 0 && !p.HasSubmitted {
+			delete(s.state.Players, fingerprint)
+			return true
+		}
+	}
+	return false
+}
+
+// readPart reads a part's bytes as MIDI. The parser is a third party's
+// and panics on some inputs (an SMPTE time division among them), so a
+// panic is a refusal like any other parse error.
+func readPart(bs []byte) (f *smf.SMF, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			f, err = nil, fmt.Errorf("not a MIDI file: %v", r)
+		}
+	}()
+	f, err = smf.ReadFrom(bytes.NewReader(bs))
+	if err != nil {
+		return nil, fmt.Errorf("not a MIDI file: %w", err)
+	}
+	return f, nil
+}
+
+// checkPart refuses a part the merge could not take: abstrack reads
+// the first track in metric ticks, and counts time at the tempo last
+// set, so time passing before a tempo is an infinite duration, and a
+// timeline long enough to overflow runs backwards — either one panics
+// when the rendition is written, after every part was taken. The
+// player's recorder sets its tempo first and records minutes.
+func checkPart(bs []byte) error {
+	f, err := readPart(bs)
+	if err != nil {
+		return err
+	}
+	if _, ok := f.TimeFormat.(smf.MetricTicks); !ok {
+		return errors.New("its time format is not metric ticks")
+	}
+	if len(f.Tracks) == 0 {
+		return errors.New("it has no tracks")
+	}
+	tempo := false
+	for _, ev := range f.Tracks[0] {
+		if ev.Delta > 0 && !tempo {
+			return errors.New("time passes before its tempo is set")
+		}
+		var bpm float64
+		if ev.Message.GetMetaTempo(&bpm) {
+			if !(bpm > 0) || math.IsInf(bpm, 1) {
+				return fmt.Errorf("its tempo is %v", bpm)
+			}
+			tempo = true
+		}
+	}
+	var last time.Duration
+	for _, ev := range abstrack.FromSMF(f, 0).Events {
+		if ev.Timestamp < last {
+			return errors.New("its timeline runs backwards")
+		}
+		last = ev.Timestamp
+	}
+	return nil
+}
+
+// mergePart merges one part's bytes into track, turning a panic in the
+// merge's asserted invariants into an error.
+func mergePart(track *abstrack.AbsTrack, bs []byte) (merged *abstrack.AbsTrack, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			merged, err = nil, fmt.Errorf("merging: %v", r)
+		}
+	}()
+	if err := checkPart(bs); err != nil {
+		return nil, err
+	}
+	f, err := readPart(bs)
+	if err != nil {
+		return nil, err
+	}
+	return track.Merge(abstrack.FromSMF(f, 0)), nil
 }
 
 // advance moves the performance on one phase. Which phase it lands in
@@ -262,11 +414,20 @@ func (s *Server) assemble(ctx context.Context) error {
 	s.setPhase(ctx, game.GamePhaseProcessing)
 
 	track := abstrack.New()
-	for _, partial := range s.partials {
-		if partial == nil {
+	for fingerprint, bs := range s.partials {
+		// Read again here rather than kept parsed since it was taken: a
+		// parsed SMF is several times its bytes. checkPart passed it
+		// when it was taken, so this cannot fail; if it somehow does,
+		// one part is not worth the rendition.
+		merged, err := mergePart(track, bs)
+		if err != nil {
+			s.log.ErrorContext(ctx, "leaving a part out of the rendition",
+				"piano.fingerprint", fingerprint,
+				"error.message", err.Error(),
+				"error.type", fmt.Sprintf("%T", err))
 			continue
 		}
-		track = track.Merge(abstrack.FromSMF(partial, 0))
+		track = merged
 	}
 	file := smf.New()
 	file.Add(track.ToSMF())

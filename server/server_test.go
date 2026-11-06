@@ -197,6 +197,29 @@ func TestReservedFingerprintsAreRefused(t *testing.T) {
 	}
 }
 
+// A fingerprint is the key a player is held under for the whole
+// performance, so its size is bounded too: the player's own is 128
+// random bytes in hex, and anything longer is refused before the
+// socket opens.
+func TestOverlongFingerprintsAreRefused(t *testing.T) {
+	s := newTestServer(t)
+	for _, tc := range []struct {
+		fingerprint string
+		refused     bool
+	}{
+		{strings.Repeat("ab", 128), false},
+		{strings.Repeat("ab", 128) + "c", true},
+		{strings.Repeat("x", 64<<10), true},
+	} {
+		req := httptest.NewRequest("GET", "/ws?fingerprint="+tc.fingerprint, nil)
+		w := httptest.NewRecorder()
+		s.Handler().ServeHTTP(w, req)
+		if got := strings.Contains(w.Body.String(), "fingerprint too long"); got != tc.refused {
+			t.Errorf("a %d-byte fingerprint: %d %q", len(tc.fingerprint), w.Code, w.Body.String())
+		}
+	}
+}
+
 // TestMalformedInputIsAnswered, not panicked through. Both sockets and
 // the schedule endpoint take gob from the public internet, and every
 // decoder used to panic on a bad frame.

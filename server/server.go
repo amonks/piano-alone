@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"gitlab.com/gomidi/midi/v2/smf"
 
 	"monks.co/piano-alone/assets"
 	"monks.co/piano-alone/db"
@@ -68,8 +67,10 @@ type Server struct {
 	// one message at a time. All of it is in memory — only the
 	// finished rendition is written down — so a restart mid-performance
 	// loses everything in flight.
-	state                  *game.State
-	partials               map[string]*smf.SMF
+	state *game.State
+	// partials are the parts players have submitted, by fingerprint, as
+	// the bytes each sent.
+	partials               map[string][]byte
 	sentSwitchToVideoModal bool
 }
 
