@@ -33,9 +33,10 @@ func run() error {
 		return fmt.Errorf("error reading '%s': %w", *filenameB, err)
 	}
 
+	// The merge is in absolute time, so the merged file can be written
+	// at either input's resolution; it takes a's.
 	mergedTrack := abstrack.FromSMF(smfA, 0).Merge(abstrack.FromSMF(smfB, 0))
-	merged := smf.New()
-	merged.Add(mergedTrack.ToSMF())
+	merged := mergedTrack.ToSMF(smfA.TimeFormat.(smf.MetricTicks))
 	if err := merged.WriteFile(*filenameOut); err != nil {
 		return fmt.Errorf("error writing output: %w", err)
 	}

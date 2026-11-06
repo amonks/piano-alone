@@ -15,8 +15,7 @@ func main() {
 func run() error {
 	f := songs.PreludeBergamasqueSMF
 	dst := abstrack.FromSMF(f, 0).Select([]uint8{61, 56, 64})
-	out := smf.New()
-	out.Add(dst.ToSMF())
+	out := dst.ToSMF(f.TimeFormat.(smf.MetricTicks))
 	if err := out.WriteFile("split.mid"); err != nil {
 		return err
 	}

@@ -1,12 +1,16 @@
 package db_test
 
 import (
+	"bytes"
 	"database/sql"
 	"errors"
+	"io/fs"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"gitlab.com/gomidi/midi/v2"
+	"gitlab.com/gomidi/midi/v2/smf"
 	_ "modernc.org/sqlite"
 
 	"monks.co/piano-alone/db"
@@ -143,6 +147,116 @@ func TestSeedGivesAFreshInstallSomethingToPlay(t *testing.T) {
 	} else if len(ps) != 1 {
 		t.Fatalf("scheduled performances after seeding twice = %d, want 1", len(ps))
 	}
+}
+
+// renditionCounted is a one-track rendition that strikes a key half a
+// second in and releases it a second in, at 120 bpm, its deltas
+// counted at 480 ticks a quarter note under a header declaring header.
+// The renditions of the piece's two performances are shaped as
+// renditionCounted(t, 960); every one written since, as
+// renditionCounted(t, 480).
+func renditionCounted(t *testing.T, header smf.MetricTicks) []byte {
+	t.Helper()
+	var tr smf.Track
+	tr.Add(0, smf.MetaTempo(120))
+	tr.Add(480, midi.NoteOn(1, 60, 100))
+	tr.Add(480, midi.NoteOff(1, 60))
+	tr.Close(0)
+	f := smf.New()
+	f.TimeFormat = header
+	if err := f.Add(tr); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	if _, err := f.WriteTo(&b); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+// The renditions of the piece's two performances were written with
+// their deltas counted at 480 ticks a quarter note under a header that
+// said 960, so anything playing them — the disklavier included —
+// played them at twice the speed their audiences played. Migration
+// 002 rewrites a rendition's header division from 960 to 480: the
+// header's two bytes alone, every event left as it was. Only a
+// rendition written before the fix says 960; one written since says
+// 480 and is left alone, as is anything in the column that is not a
+// MIDI file. The correction run again changes nothing.
+func TestRenditionsPlayedAtTwiceTheirSpeedAreCorrected(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "performances.db")
+	handle, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer handle.Close()
+	if _, err := handle.Exec(legacySchema); err != nil {
+		t.Fatal(err)
+	}
+	stored := map[string][]byte{
+		"before": renditionCounted(t, 960),
+		"since":  renditionCounted(t, 480),
+		"other":  []byte("not a MIDI file"),
+		"none":   nil,
+	}
+	for id, rendition := range stored {
+		if _, err := handle.Exec(
+			"INSERT INTO performances (id, title, composer, score, date, is_featured, is_complete, rendition, player_count) VALUES (?,?,?,?,?,?,?,?,?)",
+			id, "Prelude", "Somebody", []byte("score"), "2024-06-11 21:30:00-05:00", 1, rendition != nil, rendition, 6); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.Migrate(t.Context(), handle); err != nil {
+		t.Fatal(err)
+	}
+	store := db.New(handle)
+
+	want := map[string][]byte{
+		"before": renditionCounted(t, 480),
+		"since":  stored["since"],
+		"other":  stored["other"],
+		"none":   nil,
+	}
+	check := func(when string) {
+		t.Helper()
+		for id, w := range want {
+			got, err := store.GetMIDIFile(t.Context(), id)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(got, w) {
+				t.Errorf("%s, the rendition stored %s is %x, want %x", when, id, got, w)
+			}
+		}
+	}
+	check("after migrating")
+
+	before, err := store.GetMIDIFile(t.Context(), "before")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var at []time.Duration
+	rd := smf.ReadTracksFrom(bytes.NewReader(before)).Do(func(ev smf.TrackEvent) {
+		var ch, key, vel uint8
+		if ev.Message.GetNoteStart(&ch, &key, &vel) || ev.Message.GetNoteEnd(&ch, &key) {
+			at = append(at, time.Duration(ev.AbsMicroSeconds)*time.Microsecond)
+		}
+	})
+	if err := rd.Error(); err != nil {
+		t.Fatal(err)
+	}
+	if len(at) != 2 || at[0] != 500*time.Millisecond || at[1] != time.Second {
+		t.Errorf("the corrected rendition sounds its key at %v, want at 500ms and 1s", at)
+	}
+
+	correction, err := fs.ReadFile(db.Migrations, db.MigrationsDir+"/002_rendition_division.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := handle.Exec(string(correction)); err != nil {
+		t.Fatal(err)
+	}
+	check("after correcting again")
 }
 
 func TestRenditionRoundTrip(t *testing.T) {

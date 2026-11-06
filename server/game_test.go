@@ -583,6 +583,92 @@ func partAt(t *testing.T, end time.Duration, evs ...timed) []byte {
 	return b.Bytes()
 }
 
+// A rendition plays at the speed its audience played: a key struck a
+// second into a part sounds a second into the rendition, read as a
+// MIDI player reads it — the disklavier's client among them — at the
+// ticks a quarter note its header declares. The rendition's header
+// said 960 while its deltas were counted at 480, so it played in half
+// the time it was played in. The parts here are made by the page's own
+// recorder, the third clock in the chain, and the rendition is written
+// at 480: what the piece's first renditions were counted at, and what
+// the migration that corrected their headers relies on.
+func TestARenditionPlaysAtTheSpeedItWasPlayed(t *testing.T) {
+	s := loopServer(t)
+	conf := &game.Configuration{PerformanceID: "tonight", Title: "Tonight", Composer: "Somebody", Score: partOf(t, 60, 0)}
+	if err := s.db.SchedulePerformance(t.Context(), &game.Performance{Configuration: conf}); err != nil {
+		t.Fatal(err)
+	}
+	s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
+	s.join(t, "a")
+	s.join(t, "b")
+	s.player("a").AssignedNotes = []uint8{60}
+	s.player("b").AssignedNotes = []uint8{64}
+	s.state.Phase = game.GamePhaseHero
+
+	on := func(key uint8) midi.Message { return midi.NoteOn(recorder.Channel, key, recorder.Velocity) }
+	off := func(key uint8) midi.Message { return midi.NoteOff(recorder.Channel, key) }
+	// A part as the page records one, its clock starting at the
+	// player's first key.
+	recorded := func(evs ...timed) []byte {
+		t.Helper()
+		start := time.Date(2026, 11, 6, 20, 0, 0, 0, time.UTC)
+		r := recorder.New(120)
+		for _, ev := range evs {
+			r.Record(recorder.At(ev.msg, start.Add(ev.at)))
+		}
+		r.Close()
+		bs, err := r.Bytes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return bs
+	}
+	s.receive(t, game.MessageTypeSubmitPartialTrack, "a", recorded(
+		timed{0, on(60)}, timed{500 * time.Millisecond, off(60)},
+		timed{2 * time.Second, on(60)}, timed{2500 * time.Millisecond, off(60)}))
+	s.receive(t, game.MessageTypeSubmitPartialTrack, "b", recorded(
+		timed{0, on(64)}, timed{1500 * time.Millisecond, off(64)}))
+	if len(s.partials) != 2 {
+		t.Fatalf("%d parts taken, want both", len(s.partials))
+	}
+	s.receive(t, game.MessageTypeAdvancePhase, roleConductor, nil)
+
+	saved, err := s.db.GetMIDIFile(t.Context(), "tonight")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// When each key is struck and released, as a player hears it.
+	got := map[string][]time.Duration{}
+	rd := smf.ReadTracksFrom(bytes.NewReader(saved)).Do(func(ev smf.TrackEvent) {
+		var ch, key, vel uint8
+		at := time.Duration(ev.AbsMicroSeconds) * time.Microsecond
+		switch {
+		case ev.Message.GetNoteStart(&ch, &key, &vel):
+			got[fmt.Sprintf("%d struck", key)] = append(got[fmt.Sprintf("%d struck", key)], at)
+		case ev.Message.GetNoteEnd(&ch, &key):
+			got[fmt.Sprintf("%d released", key)] = append(got[fmt.Sprintf("%d released", key)], at)
+		}
+	})
+	if err := rd.Error(); err != nil {
+		t.Fatalf("the saved rendition does not read: %v", err)
+	}
+	if ticks := rd.SMF().TimeFormat; ticks != smf.MetricTicks(480) {
+		t.Errorf("the rendition is written at %v, want 480 ticks a quarter note", ticks)
+	}
+	want := map[string][]time.Duration{
+		"60 struck":   {0, 2 * time.Second},
+		"60 released": {500 * time.Millisecond, 2500 * time.Millisecond},
+		"64 struck":   {0},
+		"64 released": {1500 * time.Millisecond},
+	}
+	near := func(a, b []time.Duration) bool {
+		return slices.EqualFunc(a, b, func(x, y time.Duration) bool { return (x - y).Abs() <= time.Millisecond })
+	}
+	if !maps.EqualFunc(got, want, near) {
+		t.Errorf("the rendition sounds %v, want %v", got, want)
+	}
+}
+
 // A part is bounded in time and in density, by what the page can
 // record: it records for the length of the score and a few seconds
 // more, it strikes a key only once it is released, and no hand

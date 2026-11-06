@@ -33,6 +33,16 @@ const (
 // renditionBPM is the tempo a rendition is written at.
 const renditionBPM = 120
 
+// renditionTicks is the ticks a quarter note a rendition is written
+// in, its header and its deltas both. It is 480 because the piece's
+// first renditions counted their deltas at 480 under a header that
+// said 960: db's 002 migration corrected them by rewriting the two
+// header bytes rather than every delta, and at 480 the archive stays
+// one resolution, in which a header saying 960 can only be one of
+// those. At renditionBPM a tick is about a millisecond, finer than
+// any phone times a touch.
+const renditionTicks smf.MetricTicks = 480
+
 // What a part may hold, in time and in density. The page records a
 // part from the player's first key for the length of the score and
 // five seconds more, ends it half a second after the last key, strikes
@@ -47,7 +57,7 @@ const (
 	partSlack = time.Minute
 	// minStrikeGap is how soon a key may be struck again. In the
 	// renditions of the piece's two performances no player struck one
-	// key twice within 45 ms, and no hand repeats a key twice as fast
+	// key twice within 95 ms, and no hand repeats a key twice as fast
 	// as this.
 	minStrikeGap = 20 * time.Millisecond
 )
@@ -644,8 +654,7 @@ func (s *Server) assemble(ctx context.Context) error {
 		s.setPhase(ctx, game.GamePhasePlayback)
 		return nil
 	}
-	file := smf.New()
-	file.Add(track.ToSMF())
+	file := track.ToSMF(renditionTicks)
 	var buf bytes.Buffer
 	if _, err := file.WriteTo(&buf); err != nil {
 		return fmt.Errorf("writing rendition: %w", err)

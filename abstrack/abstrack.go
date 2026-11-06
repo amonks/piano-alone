@@ -61,14 +61,20 @@ func FromSMF(file *smf.SMF, trackIndex int) *AbsTrack {
 	return &AbsTrack{Events: dst}
 }
 
-func (at *AbsTrack) ToSMF() smf.Track {
+// ToSMF writes the track as a one-track SMF in ticks a quarter note:
+// the file's header declares the ticks its deltas are counted in, so
+// whoever plays it sounds each event at its timestamp. The two are set
+// here together because a header that disagrees with its deltas plays
+// at the wrong speed, and nothing in the file says so. An unclosed
+// track is closed where its last event is: gomidi writes one without
+// its end, as a file it cannot read back.
+func (at *AbsTrack) ToSMF(ticks smf.MetricTicks) *smf.SMF {
 	var (
 		src = at.Events
 		dst = make(smf.Track, len(src))
 
-		ticks               = smf.MetricTicks(480)
-		bpm   float64       = 0
-		now   time.Duration = 0
+		bpm float64       = 0
+		now time.Duration = 0
 	)
 	for i, event := range src {
 		if now > event.Timestamp {
@@ -84,7 +90,12 @@ func (at *AbsTrack) ToSMF() smf.Track {
 			event.Message.GetMetaTempo(&bpm)
 		}
 	}
-	return dst
+	dst.Close(0)
+	file := smf.New()
+	file.TimeFormat = ticks
+	// Add errs only for an unclosed track, and dst is closed.
+	_ = file.Add(dst)
+	return file
 }
 
 type CountedKey struct {
