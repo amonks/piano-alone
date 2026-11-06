@@ -56,6 +56,11 @@ var readLayouts = []string{
 // table, so a handler can answer 404 rather than 500.
 var ErrNotFound = errors.New("no such performance")
 
+// ErrComplete is returned for a rendition saved against a performance
+// that already has one. A finished performance's rendition is written
+// once; playing the piece again is a new performance.
+var ErrComplete = errors.New("performance is already complete")
+
 type DB struct{ sql *sql.DB }
 
 // New wraps an already-open, already-migrated database. The caller
@@ -189,18 +194,38 @@ func (db *DB) DeletePerformance(ctx context.Context, id string) error {
 
 // SaveRendition stores the merged MIDI of a finished performance. This
 // is the piece's one irreplaceable write: the rendition is what an
-// audience actually played, and it exists nowhere else.
+// audience actually played, and it exists nowhere else — so it is
+// written once, and a performance that already has one is ErrComplete
+// rather than overwritten. DeletePerformance is the destructive verb.
 func (db *DB) SaveRendition(ctx context.Context, id string, playerCount int, rendition []byte) error {
 	res, err := db.sql.ExecContext(ctx,
-		`UPDATE performances SET is_complete = 1, rendition = ?, player_count = ? WHERE id = ?`,
+		`UPDATE performances SET is_complete = 1, rendition = ?, player_count = ? WHERE id = ? AND is_complete = 0`,
 		rendition, playerCount, id)
 	if err != nil {
 		return err
 	}
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
-		return fmt.Errorf("%w: %s", ErrNotFound, id)
+		complete, err := db.IsComplete(ctx, id)
+		switch {
+		case err != nil:
+			return err
+		case complete:
+			return fmt.Errorf("%w: %s", ErrComplete, id)
+		}
+		return fmt.Errorf("saving the rendition of %s changed no row", id)
 	}
 	return nil
+}
+
+// IsComplete reports whether a performance has its rendition, reading
+// that one column; ErrNotFound for an id not in the table.
+func (db *DB) IsComplete(ctx context.Context, id string) (bool, error) {
+	var complete bool
+	err := db.sql.QueryRowContext(ctx, `SELECT is_complete FROM performances WHERE id = ?`, id).Scan(&complete)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, fmt.Errorf("%w: %s", ErrNotFound, id)
+	}
+	return complete, err
 }
 
 func (db *DB) Feature(ctx context.Context, id string) error {

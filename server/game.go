@@ -101,6 +101,17 @@ func (s *Server) handleMessage(ctx context.Context, msg *game.Message) error {
 		if err != nil {
 			return err
 		}
+		// The conductor's socket can begin a configuration the HTTP
+		// route never saw, so the loop asks too: a completed
+		// performance's rendition is written once (db.ErrComplete), and
+		// beginning it again would only lose this one's at the end. An
+		// id the store cannot answer for goes ahead as it always has;
+		// SaveRendition holds the line either way.
+		if complete, err := s.db.IsComplete(ctx, configuration.PerformanceID); err == nil && complete {
+			s.log.WarnContext(ctx, "refusing to begin a completed performance",
+				"piano.performance_id", configuration.PerformanceID)
+			return nil
+		}
 		// A performance begins with the audience in the room and nothing
 		// else of the last one: its parts are not this one's to merge,
 		// whoever has left is forgotten (a reload joins again), and those

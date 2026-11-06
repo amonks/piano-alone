@@ -227,6 +227,12 @@ func (s *Server) handleBeginPerformance(w http.ResponseWriter, req *http.Request
 		s.fail(w, req, err, "reading performance")
 		return
 	}
+	if perf.IsComplete {
+		// Performing it again would overwrite the rendition its
+		// audience played; that is a new performance.
+		http.Error(w, "that performance is complete: schedule a new one to play the piece again", http.StatusConflict)
+		return
+	}
 	s.control(req, game.MessageTypeBeginPerformance, perf.Configuration.Bytes())
 	io.WriteString(w, "ok")
 }

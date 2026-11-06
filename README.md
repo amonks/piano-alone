@@ -50,7 +50,9 @@ the phases; nothing here is on a timer.
 | Done | the page comes back, with the MIDI file to download |
 
 All of that is in memory except the finished rendition, so restarting
-the server mid-performance loses the performance.
+the server mid-performance loses the performance. A rendition is
+written once: a completed performance is not begun again, so playing
+the piece again means scheduling a new performance.
 
 **Run standalone, every conductor verb is open to whoever can reach
 it** — scheduling, advancing, deleting. That is the right default for a

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -548,8 +549,12 @@ func (m model) startPerformance() tea.Msg {
 	if err != nil {
 		return msgQuit(err.Error())
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return msgQuit(fmt.Sprintf("status code %d", resp.StatusCode))
+		// The server says why: a completed performance, say, is a 409
+		// asking for a new one to be scheduled.
+		why, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<10))
+		return msgQuit(fmt.Sprintf("status code %d: %s", resp.StatusCode, strings.TrimSpace(string(why))))
 	}
 	return msgStartedPerformance(url)
 }

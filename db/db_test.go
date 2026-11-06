@@ -170,6 +170,34 @@ func TestRenditionRoundTrip(t *testing.T) {
 	}
 }
 
+// A finished performance's rendition is what its audience played and
+// exists nowhere else, so it is written once: a second SaveRendition
+// against the same id is refused and leaves the first standing. Playing
+// the piece again is a new performance.
+func TestACompletedRenditionIsNeverOverwritten(t *testing.T) {
+	store := openFresh(t)
+	perf := &game.Performance{
+		Configuration: &game.Configuration{PerformanceID: "abc", Title: "Test", Composer: "Nobody"},
+		Date:          time.Date(2026, 8, 21, 17, 0, 0, 0, time.UTC),
+	}
+	if err := store.SchedulePerformance(t.Context(), perf); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveRendition(t.Context(), "abc", 7, []byte("what they played")); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.SaveRendition(t.Context(), "abc", 2, []byte("something else")); !errors.Is(err, db.ErrComplete) {
+		t.Errorf("a second SaveRendition returned %v, want ErrComplete", err)
+	}
+	got, err := store.GetPerformance(t.Context(), "abc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got.Rendition) != "what they played" || got.PlayerCount != 7 {
+		t.Errorf("after a refused overwrite: rendition %q, players %d", got.Rendition, got.PlayerCount)
+	}
+}
+
 // TestMissingPerformanceIsNotAnInternalError: the id comes from the
 // URL, so a bad one is the caller's mistake. The handlers tell the two
 // apart by this error.

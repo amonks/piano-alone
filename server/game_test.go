@@ -2,9 +2,13 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/smf"
@@ -313,5 +317,44 @@ func TestTheRenditionMergesThePartsTaken(t *testing.T) {
 	}
 	if !played[60] || !played[64] || len(played) != 2 {
 		t.Errorf("the rendition plays %v, want both parts' keys", played)
+	}
+}
+
+// A completed performance is not begun again — not from the conductor's
+// CLI, which is answered 409, and not from the conductor's socket,
+// which the loop refuses — since performing it would overwrite the
+// rendition its audience played. Playing the piece again is scheduling
+// a new performance; deleting one is the destructive verb.
+func TestACompletedPerformanceIsNotBegunAgain(t *testing.T) {
+	s := loopServer(t)
+	conf := &game.Configuration{PerformanceID: "done", Title: "Done", Composer: "Somebody", Score: partOf(t, 60, 0)}
+	if err := s.db.SchedulePerformance(t.Context(), &game.Performance{Configuration: conf}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.db.SaveRendition(t.Context(), "done", 6, []byte("what they played")); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	req := httptest.NewRequestWithContext(ctx, "POST", "/performances/done/begin", nil)
+	w := httptest.NewRecorder()
+	s.Handler().ServeHTTP(w, req)
+	if w.Code != http.StatusConflict {
+		t.Errorf("POST begin on a completed performance: %d %q, want 409", w.Code, w.Body.String())
+	}
+	select {
+	case m := <-s.inbox:
+		t.Errorf("the refused begin reached the loop: %s", m.Type)
+	default:
+	}
+
+	s.join(t, "a")
+	s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
+	if s.state.Phase != game.GamePhaseUninitialized || s.state.Configuration != nil {
+		t.Errorf("the loop began a completed performance: phase %s, configuration %+v", s.state.Phase, s.state.Configuration)
+	}
+	if s.player("a") == nil {
+		t.Error("the refused begin cleared the room")
 	}
 }
