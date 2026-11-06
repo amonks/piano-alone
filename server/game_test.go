@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"slices"
@@ -548,5 +549,146 @@ func TestAPartsTempoMovesNoOneElsesNotes(t *testing.T) {
 		if got := timesBeside(b.Bytes()); !slices.Equal(got, want) {
 			t.Errorf("beside a part at %v bpm, a's notes sound at %v, want %v", bpm, got, want)
 		}
+	}
+}
+
+// timed is a MIDI message at a time from the start of a part.
+type timed struct {
+	at  time.Duration
+	msg midi.Message
+}
+
+// partAt is a part with its events at the times given, which must be
+// in order, ending at end: at the recorder's 120 bpm and 960 ticks a
+// beat, 1920 ticks a second.
+func partAt(t *testing.T, end time.Duration, evs ...timed) []byte {
+	t.Helper()
+	ticks := func(d time.Duration) uint32 { return uint32(d * 1920 / time.Second) }
+	var tr smf.Track
+	tr.Add(0, smf.MetaTempo(120))
+	var now time.Duration
+	for _, ev := range evs {
+		tr.Add(ticks(ev.at-now), ev.msg)
+		now = ev.at
+	}
+	tr.Close(ticks(end - now))
+	f := smf.New()
+	if err := f.Add(tr); err != nil {
+		t.Fatal(err)
+	}
+	var b bytes.Buffer
+	if _, err := f.WriteTo(&b); err != nil {
+		t.Fatal(err)
+	}
+	return b.Bytes()
+}
+
+// A part is bounded in time and in density, by what the page can
+// record: it records for the length of the score and a few seconds
+// more, it strikes a key only once it is released, and no hand
+// repeats one key faster than minStrikeGap. A rewritten page could put
+// a key hours past the score (or end its part days past it, which the
+// rendition's length followed), pack thousands of strikes of one key
+// into one instant, or strike a key twice without releasing it. What
+// the page records is taken whole — including a key still held when
+// it stops recording, which is released where the part ends rather
+// than left down on the disklavier.
+func TestAPartIsBoundedInTimeAndDensity(t *testing.T) {
+	s := loopServer(t)
+	score := partOf(t, 60, 0)
+	conf := &game.Configuration{PerformanceID: "tonight", Title: "Tonight", Composer: "Somebody", Score: score}
+	if err := s.db.SchedulePerformance(t.Context(), &game.Performance{Configuration: conf}); err != nil {
+		t.Fatal(err)
+	}
+	s.receive(t, game.MessageTypeBeginPerformance, roleConductor, conf.Bytes())
+	s.join(t, "rewritten")
+	s.join(t, "real")
+	s.player("rewritten").AssignedNotes = []uint8{60, 62}
+	s.player("real").AssignedNotes = []uint8{64}
+	s.state.Phase = game.GamePhaseHero
+
+	on := func(key uint8) midi.Message { return midi.NoteOn(recorder.Channel, key, 100) }
+	off := func(key uint8) midi.Message { return midi.NoteOff(recorder.Channel, key) }
+
+	// The rewritten page: one ordinary strike, at the loudest velocity
+	// MIDI carries; a thousand strikes of the same key in one instant;
+	// a key struck twice and never released; a strike two hours past
+	// the score; and an end three hours past it.
+	evs := []timed{{0, midi.NoteOn(recorder.Channel, 60, 127)}, {100 * time.Millisecond, off(60)}}
+	for range 1000 {
+		evs = append(evs, timed{time.Second, on(60)}, timed{time.Second, off(60)})
+	}
+	evs = append(evs,
+		timed{2 * time.Second, on(62)},
+		timed{2500 * time.Millisecond, on(62)},
+		timed{2 * time.Hour, on(60)},
+		timed{2*time.Hour + time.Second, off(60)},
+	)
+	s.receive(t, game.MessageTypeSubmitPartialTrack, "rewritten", partAt(t, 3*time.Hour, evs...))
+
+	// The real page: ten strikes a tenth of a second apart, the last
+	// still held when the recording stops, half a second before the
+	// part ends.
+	var real []timed
+	for i := range 10 {
+		at := time.Duration(i) * 100 * time.Millisecond
+		real = append(real, timed{at, on(64)})
+		if i < 9 {
+			real = append(real, timed{at + 50*time.Millisecond, off(64)})
+		}
+	}
+	s.receive(t, game.MessageTypeSubmitPartialTrack, "real", partAt(t, 1400*time.Millisecond, real...))
+	if len(s.partials) != 2 {
+		t.Fatalf("%d parts taken, want both", len(s.partials))
+	}
+	s.receive(t, game.MessageTypeAdvancePhase, roleConductor, nil)
+
+	saved, err := s.db.GetMIDIFile(t.Context(), "tonight")
+	if err != nil {
+		t.Fatal(err)
+	}
+	rendition, err := smf.ReadFrom(bytes.NewReader(saved))
+	if err != nil {
+		t.Fatalf("the saved rendition does not parse: %v", err)
+	}
+	track := abstrack.FromSMF(rendition, 0)
+	scoreFile, err := smf.ReadFrom(bytes.NewReader(score))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bound := abstrack.FromSMF(scoreFile, 0).Dur() + partSlack; track.Dur() > bound {
+		t.Errorf("the rendition runs %v, past the %v a part may", track.Dur(), bound)
+	}
+	strikes := map[uint8]int{}
+	sounding := map[uint8]bool{}
+	var lastKey uint8
+	for _, ev := range track.Events {
+		var ch, key, vel uint8
+		switch {
+		case ev.Message.GetNoteStart(&ch, &key, &vel):
+			if sounding[key] {
+				t.Errorf("%d is struck again at %v while it sounds", key, ev.Timestamp)
+			}
+			if vel != recorder.Velocity {
+				t.Errorf("%d is struck at %v at velocity %d, want the page's %d", key, ev.Timestamp, vel, recorder.Velocity)
+			}
+			strikes[key]++
+			sounding[key] = true
+			lastKey = key
+		case ev.Message.GetNoteEnd(&ch, &key):
+			sounding[key] = false
+			lastKey = key
+		}
+	}
+	if want := map[uint8]int{60: 2, 62: 1, 64: 10}; !maps.Equal(strikes, want) {
+		t.Errorf("the rendition strikes %v, want %v", strikes, want)
+	}
+	for key, down := range sounding {
+		if down {
+			t.Errorf("%d is left held at the end of the rendition", key)
+		}
+	}
+	if lastKey != 62 {
+		t.Errorf("the last key the rendition moves is %d, want 62, released where the longer part ends", lastKey)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"gitlab.com/gomidi/midi/v2"
 	"gitlab.com/gomidi/midi/v2/smf"
 
 	"monks.co/piano-alone/abstrack"
@@ -31,6 +32,25 @@ const (
 
 // renditionBPM is the tempo a rendition is written at.
 const renditionBPM = 120
+
+// What a part may hold, in time and in density. The page records a
+// part from the player's first key for the length of the score and
+// five seconds more, ends it half a second after the last key, strikes
+// a key only once it is released, and is played by a hand. A rewritten
+// page is none of those: it could put its keys hours past the score
+// (and the rendition runs as long as its longest part), strike one key
+// thousands of times in an instant for the disklavier to play, or
+// strike a key it never releases.
+const (
+	// partSlack is how far past the score's length a part may run. The
+	// page's own parts end within six seconds of it.
+	partSlack = time.Minute
+	// minStrikeGap is how soon a key may be struck again. In the
+	// renditions of the piece's two performances no player struck one
+	// key twice within 45 ms, and no hand repeats a key twice as fast
+	// as this.
+	minStrikeGap = 20 * time.Millisecond
+)
 
 // play is the game loop: one goroutine, one state, messages handled
 // strictly in the order they arrive, which is why nothing here takes a
@@ -350,22 +370,109 @@ func checkPart(bs []byte) error {
 }
 
 // mergePart merges what one part's bytes may contribute — the keys
-// dealt, by onlyDealt — into track, turning a panic in the merge's
-// asserted invariants into an error.
-func mergePart(track *abstrack.AbsTrack, bs []byte, dealt []uint8) (merged *abstrack.AbsTrack, err error) {
+// dealt, by onlyDealt, within what a page can record by end, by
+// bounded — into track, and reports how many of the part's events
+// bounded left out. A panic in the merge's asserted invariants is an
+// error.
+func mergePart(track *abstrack.AbsTrack, bs []byte, dealt []uint8, end time.Duration) (merged *abstrack.AbsTrack, dropped int, err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			merged, err = nil, fmt.Errorf("merging: %v", r)
+			merged, dropped, err = nil, 0, fmt.Errorf("merging: %v", r)
 		}
 	}()
 	if err := checkPart(bs); err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	f, err := readPart(bs)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return track.Merge(onlyDealt(abstrack.FromSMF(f, 0), dealt)), nil
+	part, dropped := bounded(onlyDealt(abstrack.FromSMF(f, 0), dealt), end)
+	return track.Merge(part), dropped, nil
+}
+
+// bounded holds a part, as onlyDealt leaves it, to what the page can
+// record: nothing after end; a key struck only once it is released,
+// and not again within minStrikeGap of its last strike, and at
+// recorder.Velocity, the one velocity the page strikes at; a key
+// released only while it is down. It reports how many events it left out, which
+// for a part the page recorded is none. The part ends where it said it
+// did, or at end if that is sooner, and a key still down there is
+// released there: the page stops recording on a timer, so a player
+// holding a key when it does sends a strike with no release, and the
+// disklavier would hold that key down.
+func bounded(part *abstrack.AbsTrack, end time.Duration) (*abstrack.AbsTrack, int) {
+	var (
+		kept     = abstrack.New()
+		dropped  int
+		down     = map[uint8]bool{}
+		struck   = map[uint8]time.Duration{}
+		last     time.Duration
+		partEnd  time.Duration
+		hasEnded bool
+	)
+	for _, ev := range part.Events {
+		var channel, key, velocity uint8
+		switch {
+		case ev.Message.Is(smf.MetaEndOfTrackMsg):
+			partEnd, hasEnded = ev.Timestamp, true
+			continue
+		case ev.Timestamp > end:
+			dropped++
+			continue
+		case ev.Message.GetNoteStart(&channel, &key, &velocity):
+			if at, ok := struck[key]; down[key] || ok && ev.Timestamp-at < minStrikeGap {
+				dropped++
+				continue
+			}
+			down[key], struck[key] = true, ev.Timestamp
+			ev.Message = smf.Message(midi.NoteOn(recorder.Channel, key, recorder.Velocity))
+		case ev.Message.GetNoteEnd(&channel, &key):
+			if !down[key] {
+				dropped++
+				continue
+			}
+			down[key] = false
+		default:
+			// onlyDealt has left only notes and the track's end.
+			continue
+		}
+		kept.Append(ev)
+		last = ev.Timestamp
+	}
+	if !hasEnded || partEnd < last {
+		partEnd = last
+	}
+	partEnd = min(partEnd, end)
+	for key := range 128 {
+		if down[uint8(key)] {
+			kept.Append(abstrack.AbsEvent{Timestamp: partEnd, Message: smf.Message(midi.NoteOff(recorder.Channel, uint8(key)))})
+		}
+	}
+	kept.Append(abstrack.AbsEvent{Timestamp: partEnd, Message: smf.EOT})
+	return kept, dropped
+}
+
+// scoreLength is how long the score's notes run, as the page reads
+// them: its first track, at its own tempo.
+func scoreLength(score []byte) (length time.Duration, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			length, err = 0, fmt.Errorf("reading the score: %v", r)
+		}
+	}()
+	f, err := readPart(score)
+	if err != nil {
+		return 0, err
+	}
+	if len(f.Tracks) == 0 {
+		return 0, errors.New("the score has no tracks")
+	}
+	track := abstrack.FromSMF(f, 0)
+	if len(track.Events) == 0 {
+		return 0, nil
+	}
+	return track.Dur(), nil
 }
 
 // onlyDealt is what a part contributes to the rendition: the strikes
@@ -475,6 +582,19 @@ func (s *Server) assemble(ctx context.Context) error {
 	// records at.
 	track := abstrack.New()
 	track.Append(abstrack.AbsEvent{Message: smf.MetaTempo(renditionBPM)})
+	// How long a part may run. The score was read when the notes were
+	// dealt, so it reads now; if it somehow does not, the parts are held
+	// to the slack alone rather than to nothing.
+	end := partSlack
+	if s.state.Configuration != nil {
+		length, err := scoreLength(s.state.Configuration.Score)
+		if err != nil {
+			s.log.ErrorContext(ctx, "holding the parts to the slack alone",
+				"error.message", err.Error(),
+				"error.type", fmt.Sprintf("%T", err))
+		}
+		end += length
+	}
 	for id, bs := range s.partials {
 		// Read again here rather than kept parsed since it was taken: a
 		// parsed SMF is several times its bytes. checkPart passed it
@@ -486,13 +606,18 @@ func (s *Server) assemble(ctx context.Context) error {
 		if player := s.player(id); player != nil {
 			dealt = player.AssignedNotes
 		}
-		merged, err := mergePart(track, bs, dealt)
+		merged, dropped, err := mergePart(track, bs, dealt, end)
 		if err != nil {
 			s.log.ErrorContext(ctx, "leaving a part out of the rendition",
 				"piano.player", id,
 				"error.message", err.Error(),
 				"error.type", fmt.Sprintf("%T", err))
 			continue
+		}
+		if dropped > 0 {
+			s.log.WarnContext(ctx, "leaving out what no page records",
+				"piano.player", id,
+				"piano.dropped_events", dropped)
 		}
 		track = merged
 	}

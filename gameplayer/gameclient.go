@@ -200,7 +200,7 @@ func (c *GameClient) handleMessage(m message) error {
 				now := time.Now()
 				var msg midi.Message
 				if on {
-					msg = midi.NoteOn(recorder.Channel, noteno, 100)
+					msg = midi.NoteOn(recorder.Channel, noteno, recorder.Velocity)
 				} else {
 					msg = midi.NoteOff(recorder.Channel, noteno)
 				}
@@ -288,7 +288,7 @@ func (c *GameClient) handleMessage(m message) error {
 				now := time.Now()
 				var msg midi.Message
 				if on {
-					msg = midi.NoteOn(recorder.Channel, noteno, 100)
+					msg = midi.NoteOn(recorder.Channel, noteno, recorder.Velocity)
 				} else {
 					msg = midi.NoteOff(recorder.Channel, noteno)
 				}

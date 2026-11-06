@@ -15,6 +15,12 @@ import (
 // alone, so the page and the server have to agree on it.
 const Channel = 1
 
+// Velocity is how hard the page strikes every key: a phone's screen
+// knows nothing of how hard it was touched. The server sounds every
+// strike at it, so a rewritten page can no more play louder than it
+// can play another key.
+const Velocity = 100
+
 // Recorder records notes into a MIDI SMF file.
 type Recorder struct {
 	bpm      float64
