@@ -323,6 +323,17 @@ func (s *Server) handlePlayerWebsocket(w http.ResponseWriter, req *http.Request)
 		http.Error(w, "fingerprint too long", http.StatusBadRequest)
 		return
 	}
+	// A seat, held until the socket closes. Past the last one the
+	// request is refused before it is upgraded.
+	select {
+	case s.seats <- struct{}{}:
+		defer func() { <-s.seats }()
+	default:
+		s.log.WarnContext(req.Context(), "refusing a socket: every seat is taken",
+			"piano.sockets", maxPlayerSockets)
+		http.Error(w, "too many players are connected: try again in a moment", http.StatusServiceUnavailable)
+		return
+	}
 	// The fingerprint is the player's credential, and it goes no
 	// further than this: from here on the player is its id, in the
 	// game loop, in every message any socket is sent, and in the logs.
@@ -347,20 +358,33 @@ func (s *Server) socket(w http.ResponseWriter, req *http.Request, origin string)
 		return
 	}
 	ctx := req.Context()
-	s.addConn(ctx, origin, conn)
+	room, limit := playerQueue, int64(maxPlayerMessageBytes)
+	switch origin {
+	case roleConductor:
+		room, limit = controllerQueue, maxConductorMessageBytes
+	case roleDisklavier:
+		room = controllerQueue
+	}
+	p := &peer{conn: conn, queue: make(chan frame, room), gone: make(chan struct{})}
+	go s.writeLoop(ctx, origin, p)
+	s.addConn(ctx, origin, p)
 	s.log.InfoContext(ctx, "socket opened", "piano.origin", origin)
 
-	limit := int64(maxPlayerMessageBytes)
-	if origin == roleConductor {
-		limit = maxConductorMessageBytes
-	}
 	conn.SetReadLimit(limit)
+	// A peer that is there answers its pings, and anything read from
+	// it — a pong, a message — shows it is.
+	alive := func() { conn.SetReadDeadline(time.Now().Add(readTimeout)) }
+	conn.SetPongHandler(func(string) error { alive(); return nil })
+	alive()
+	var turns pace
 	for {
 		_, bs, err := conn.ReadMessage()
 		if err != nil {
 			conn.Close()
 			break
 		}
+		alive()
+		turns.wait()
 		m, err := game.MessageFromBytes(bs)
 		if err != nil {
 			s.log.WarnContext(ctx, "dropping malformed socket message",
@@ -372,8 +396,31 @@ func (s *Server) socket(w http.ResponseWriter, req *http.Request, origin string)
 		s.fromClient(ctx, origin, m)
 	}
 
-	s.removeConn(ctx, origin, conn)
+	close(p.gone)
+	s.removeConn(ctx, origin, p)
 	s.log.InfoContext(ctx, "socket closed", "piano.origin", origin)
+}
+
+// pace spaces out the messages read from one socket: inboundBurst may
+// come at once, and the rest inboundGap apart. Waiting here leaves the
+// socket's next message unread, so a socket that sends faster slows
+// only itself.
+type pace struct {
+	// next is when the socket's next message is due, were they all
+	// inboundGap apart.
+	next time.Time
+}
+
+// wait takes one message's turn, sleeping until it comes.
+func (p *pace) wait() {
+	now := time.Now()
+	if p.next.Before(now) {
+		p.next = now
+	}
+	if early := p.next.Sub(now) - (inboundBurst-1)*inboundGap; early > 0 {
+		time.Sleep(early)
+	}
+	p.next = p.next.Add(inboundGap)
 }
 
 // fromClient stamps a socket message with its origin and refuses the
@@ -403,17 +450,31 @@ func (s *Server) fromClient(ctx context.Context, origin string, m *game.Message)
 	return s.send(ctx, m)
 }
 
-func (s *Server) addConn(ctx context.Context, origin string, conn *websocket.Conn) {
+// addConn gives a socket its place, and closes the socket that held
+// it. Messages go to whoever holds a place, so the older socket would
+// be sent nothing more; left open it is a socket nothing counts — and
+// the disklavier's place is public, so opening it over and over would
+// leave any number of them. It is told why, since the one person who
+// reads the reason is whoever started a second controller.
+func (s *Server) addConn(ctx context.Context, origin string, p *peer) {
 	s.connMu.Lock()
+	var replaced *peer
 	switch origin {
 	case roleDisklavier:
-		s.disklavierConn = conn
+		replaced, s.disklavierConn = s.disklavierConn, p
 	case roleConductor:
-		s.conductorConn = conn
+		replaced, s.conductorConn = s.conductorConn, p
 	default:
-		s.conns[origin] = conn
+		replaced, s.conns[origin] = s.conns[origin], p
 	}
 	s.connMu.Unlock()
+
+	if replaced != nil {
+		replaced.conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(closeReplaced, "replaced by a newer connection"),
+			time.Now().Add(time.Second))
+		replaced.conn.Close()
+	}
 
 	switch origin {
 	case roleDisklavier:
@@ -435,20 +496,20 @@ func (s *Server) addConn(ctx context.Context, origin string, conn *websocket.Con
 // reason plus one: an impostor who grabs the disklavier slot and drops
 // it would otherwise nil out whatever conn is registered by then,
 // including a real disklavier that reconnected in between.
-func (s *Server) removeConn(ctx context.Context, origin string, conn *websocket.Conn) {
+func (s *Server) removeConn(ctx context.Context, origin string, p *peer) {
 	s.connMu.Lock()
-	var current *websocket.Conn
+	var current *peer
 	switch origin {
 	case roleDisklavier:
-		if current = s.disklavierConn; current == conn {
+		if current = s.disklavierConn; current == p {
 			s.disklavierConn = nil
 		}
 	case roleConductor:
-		if current = s.conductorConn; current == conn {
+		if current = s.conductorConn; current == p {
 			s.conductorConn = nil
 		}
 	default:
-		if current = s.conns[origin]; current == conn {
+		if current = s.conns[origin]; current == p {
 			delete(s.conns, origin)
 		}
 	}
@@ -456,7 +517,7 @@ func (s *Server) removeConn(ctx context.Context, origin string, conn *websocket.
 
 	// Someone else holds the slot now, so there is nothing to announce:
 	// they are connected, and saying otherwise would mark them gone.
-	if current != conn {
+	if current != p {
 		return
 	}
 
@@ -479,7 +540,7 @@ func (s *Server) removeConn(ctx context.Context, origin string, conn *websocket.
 	}
 }
 
-func (s *Server) withConn(to string, f func(string, *websocket.Conn)) {
+func (s *Server) withConn(to string, f func(string, *peer)) {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
 	switch to {
@@ -505,7 +566,7 @@ func (s *Server) withConn(to string, f func(string, *websocket.Conn)) {
 	}
 }
 
-func (s *Server) eachConn(f func(string, *websocket.Conn)) {
+func (s *Server) eachConn(f func(string, *peer)) {
 	s.connMu.RLock()
 	defer s.connMu.RUnlock()
 	if s.disklavierConn != nil {

@@ -55,10 +55,14 @@ type Server struct {
 
 	mux http.Handler
 
-	disklavierConn *websocket.Conn
-	conductorConn  *websocket.Conn
-	conns          map[string]*websocket.Conn
+	// The open sockets, by whose they are: one for each controller's
+	// role and one for each player's id.
+	disklavierConn *peer
+	conductorConn  *peer
+	conns          map[string]*peer
 	connMu         sync.RWMutex
+	// seats holds one token for each player's socket that is open.
+	seats chan struct{}
 
 	inbox  chan *game.Message
 	outbox chan *game.Message
@@ -112,7 +116,8 @@ func New(ctx context.Context, opts Options) (*Server, error) {
 		log:        log,
 		bodyEnd:    opts.BodyEnd,
 		clientPath: opts.ClientPath,
-		conns:      map[string]*websocket.Conn{},
+		conns:      map[string]*peer{},
+		seats:      make(chan struct{}, maxPlayerSockets),
 		outbox:     make(chan *game.Message),
 		inbox:      make(chan *game.Message),
 	}
@@ -203,26 +208,101 @@ func (s *Server) Go(ctx context.Context, addr string) error {
 	return err
 }
 
+// What the sockets may cost, whoever opens them. A player's socket is
+// public and anonymous, and each open one is two goroutines, a
+// connection's buffers, and the frames waiting to be written to it.
+const (
+	// maxPlayerSockets is how many players' sockets are open at once:
+	// one for every player a performance holds, and a quarter again
+	// for pages caught reloading. The piece's audiences were twelve
+	// and six. The controllers' sockets are not counted, so a full
+	// house cannot keep the conductor or the disklavier out.
+	maxPlayerSockets = maxPlayers + maxPlayers/4
+
+	// playerQueue is how many frames may wait for a player's socket.
+	// A whole performance sends one player about eight — the state,
+	// its notes, each phase — so a socket this far behind has missed
+	// the performance.
+	playerQueue = 8
+
+	// controllerQueue is how many frames may wait for a controller's
+	// socket. A controller is told of every player, so it holds twice
+	// what every player's socket at once could have it told
+	// (inboundBurst messages each). These frames are small: a
+	// player's id, or its record.
+	controllerQueue = 2 * maxPlayerSockets * inboundBurst
+
+	// writeTimeout bounds one socket write. A phone on bad venue wifi
+	// is given this long to take a frame; a socket that takes longer
+	// is closed.
+	writeTimeout = 10 * time.Second
+
+	// pingInterval is how often each socket is pinged, and readTimeout
+	// how long one may go without answering — or sending anything —
+	// before it is closed. A peer that has gone says nothing, and a
+	// socket nothing is written to never fails, so without these a
+	// phone out of range held its socket until the server restarted.
+	// Three pings may go missing, since venue wifi drops a phone for
+	// longer than it drops a packet, and a page does not reconnect by
+	// itself: closing a socket that was only slow costs its player the
+	// performance until they reload.
+	pingInterval = 30 * time.Second
+	readTimeout  = 3 * pingInterval
+
+	// inboundBurst is how many of a socket's messages are read at
+	// once, and inboundGap how far apart the rest are. A page sends
+	// four messages in a performance. The loop tells the controllers
+	// of most of them, so an unpaced socket could have a controller
+	// told of it thousands of times a second, faster than the
+	// controller's socket drains — and a socket that falls behind is
+	// closed.
+	inboundBurst = 8
+	inboundGap   = time.Second
+
+	// closeReplaced is the close code a socket is sent when a newer
+	// one takes its place: a private-use code, since no standard one
+	// says it.
+	closeReplaced = 4000
+)
+
+// peer is one open socket: the connection, and the frames waiting for
+// its writer.
+type peer struct {
+	conn  *websocket.Conn
+	queue chan frame
+	// gone is closed when the socket's read loop ends.
+	gone chan struct{}
+}
+
+// frame is a message as the sockets carry it, encoded once however
+// many sockets it is for.
+type frame struct {
+	kind  game.MessageType
+	bytes []byte
+}
+
 // deliver fans the game loop's outbound messages out to the sockets.
-// A write that fails is the connection's problem, not the server's:
-// this used to panic, which meant one player closing a laptop lid at
-// the wrong moment took the performance down.
+// It waits on none of them. Each socket has a writer of its own, and
+// delivery only queues a frame for it: this used to write to every
+// socket in turn, so a socket that stopped reading held each message
+// for ten seconds, and with it every other socket and the game loop,
+// which hands delivery one message at a time. Anyone may open a
+// player's socket and not read from it.
 func (s *Server) deliver(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case m := <-s.outbox:
+			f := frame{kind: m.Type, bytes: m.Bytes()}
 			if m.Player == toEveryone {
-				s.eachConn(func(id string, sock *websocket.Conn) {
-					s.write(ctx, id, sock, m)
-				})
+				s.eachConn(func(id string, p *peer) { s.enqueue(ctx, id, p, f) })
 				continue
 			}
 			delivered := false
-			s.withConn(m.Player, func(id string, conn *websocket.Conn) {
+			s.withConn(m.Player, func(id string, p *peer) {
 				delivered = true
-				s.write(ctx, id, conn, m)
+				s.enqueue(ctx, id, p, f)
 			})
 			if !delivered {
 				s.log.DebugContext(ctx, "dropping message for absent recipient",
@@ -232,24 +312,55 @@ func (s *Server) deliver(ctx context.Context) {
 	}
 }
 
-// writeTimeout bounds one socket write. Delivery is a single
-// goroutine holding the registry's read lock, so a phone on bad venue
-// wifi that stops reading would otherwise stall every other player,
-// block a connect or disconnect behind the write lock, and then block
-// the game loop on its own send. A write that fails is the
-// connection's problem; without a deadline, a write that *hangs* is
-// everyone's.
-const writeTimeout = 10 * time.Second
-
-func (s *Server) write(ctx context.Context, id string, conn *websocket.Conn, m *game.Message) {
-	conn.SetWriteDeadline(time.Now().Add(writeTimeout))
-	if err := conn.WriteMessage(websocket.BinaryMessage, m.Bytes()); err != nil {
-		s.log.WarnContext(ctx, "websocket write failed",
-			"piano.message_type", m.Type.String(),
+// enqueue leaves a frame for a socket's writer, and closes a socket
+// with no room for it. A socket that far behind is not waited for,
+// and what it has missed is not kept for it: a page that reloads
+// joins again and is sent the state whole.
+func (s *Server) enqueue(ctx context.Context, id string, p *peer, f frame) {
+	select {
+	case p.queue <- f:
+	default:
+		s.log.WarnContext(ctx, "closing a socket that fell behind",
+			"piano.message_type", f.kind.String(),
 			"piano.recipient", id,
-			"error.message", err.Error(),
-			"error.type", fmt.Sprintf("%T", err))
-		conn.Close()
+			"piano.queued_frames", len(p.queue))
+		p.conn.Close()
+	}
+}
+
+// writeLoop is a socket's one writer: the frames queued for it, and a
+// ping every pingInterval. A write that fails is the connection's
+// problem, not the server's: this used to panic, which meant one
+// player closing a laptop lid at the wrong moment took the performance
+// down. The socket is closed, which ends its read loop too.
+func (s *Server) writeLoop(ctx context.Context, id string, p *peer) {
+	ping := time.NewTicker(pingInterval)
+	defer ping.Stop()
+	for {
+		var (
+			kind string
+			err  error
+		)
+		select {
+		case <-p.gone:
+			return
+		case f := <-p.queue:
+			kind = f.kind.String()
+			p.conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+			err = p.conn.WriteMessage(websocket.BinaryMessage, f.bytes)
+		case <-ping.C:
+			kind = "ping"
+			err = p.conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout))
+		}
+		if err != nil {
+			s.log.WarnContext(ctx, "websocket write failed",
+				"piano.message_type", kind,
+				"piano.recipient", id,
+				"error.message", err.Error(),
+				"error.type", fmt.Sprintf("%T", err))
+			p.conn.Close()
+			return
+		}
 	}
 }
 

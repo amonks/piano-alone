@@ -325,7 +325,11 @@ func (s *Server) evictLeaver() bool {
 
 // readPart reads a part's bytes as MIDI. The parser is a third party's
 // and panics on some inputs (an SMPTE time division among them), so a
-// panic is a refusal like any other parse error.
+// panic is a refusal like any other parse error. It also allocates
+// whatever length an event declares, which no recover undoes, so a
+// player's part passes checkFraming before it is read here. The score
+// is read as it comes: it is the conductor's, and a MIDI editor may
+// lay a file out in ways checkFraming refuses.
 func readPart(bs []byte) (f *smf.SMF, err error) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -339,13 +343,18 @@ func readPart(bs []byte) (f *smf.SMF, err error) {
 	return f, nil
 }
 
-// checkPart refuses a part the merge could not take: abstrack reads
-// the first track in metric ticks, and counts time at the tempo last
-// set, so time passing before a tempo is an infinite duration, and a
-// timeline long enough to overflow runs backwards — either one panics
-// when the rendition is written, after every part was taken. The
-// player's recorder sets its tempo first and records minutes.
+// checkPart refuses a part the parser or the merge could not take. Its
+// framing comes first, before the parser sees it (checkFraming). Then
+// what the merge needs: abstrack reads the first track in metric
+// ticks, and counts time at the tempo last set, so time passing before
+// a tempo is an infinite duration, and a timeline long enough to
+// overflow runs backwards — either one panics when the rendition is
+// written, after every part was taken. The player's recorder sets its
+// tempo first and records minutes.
 func checkPart(bs []byte) error {
+	if err := checkFraming(bs); err != nil {
+		return err
+	}
 	f, err := readPart(bs)
 	if err != nil {
 		return err
